@@ -1,0 +1,43 @@
+import { ParkingSpot } from '@/types';
+
+export const MOCK_SPOTS: ParkingSpot[] = [
+    {
+        id: '1',
+        title: 'Spacious Driveway in Kitsilano',
+        description: 'Large driveway, easy access, close to the beach.',
+        address: '2000 W 4th Ave, Vancouver, BC',
+        lat: 49.268,
+        lng: -123.15,
+        pricePerHour: 5,
+        hostId: 'host1',
+        availableStart: '08:00',
+        availableEnd: '22:00',
+        images: ['https://images.unsplash.com/photo-1621929747188-6b4e1f134894?w=800&auto=format&fit=crop&q=60'],
+    },
+    {
+        id: '2',
+        title: 'Downtown Secure Underground Spot',
+        description: 'Secure underground parking in the heart of downtown.',
+        address: '800 Robson St, Vancouver, BC',
+        lat: 49.282,
+        lng: -123.12,
+        pricePerHour: 12,
+        hostId: 'host2',
+        availableStart: '00:00',
+        availableEnd: '23:59',
+        images: ['https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&auto=format&fit=crop&q=60'],
+    },
+    {
+        id: '3',
+        title: 'Mount Pleasant Backyard Spot',
+        description: 'Quiet spot in the alley, perfect for day trips.',
+        address: '100 E 10th Ave, Vancouver, BC',
+        lat: 49.262,
+        lng: -123.10,
+        pricePerHour: 4,
+        hostId: 'host3',
+        availableStart: '09:00',
+        availableEnd: '18:00',
+        images: ['https://images.unsplash.com/photo-1506521781263-d8422e82f27a?w=800&auto=format&fit=crop&q=60'],
+    },
+];
