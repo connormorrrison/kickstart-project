@@ -1,136 +1,109 @@
-from processor import IntervalCalendar, Option, Renter
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List
-from db import supabase
+from processor import IntervalCalendar, Option
+from db import fetch
 
 app = FastAPI()
 
 @app.get("/")
 def root():
-    return {"message": "backend is running"}
-
-@app.get("/options")
-def get_options():
-    res = supabase.table("options").select("*").execute()
-    return res.data
-
-class Interval(BaseModel):
-    start: int
-    end: int
-
-
-class OptionCreate(BaseModel):
-    renter_name: str
-    renter_phone: str
-    location: str
-    price: float
-    intervals: List[Interval]
-
+    return {"message": "backend is running..."}
 
 class OptionOut(BaseModel):
     id: int
-    renter_name: str
-    renter_phone: str
-    location: str
+    host_id: int
+    address: str
     price: float
-
+    lat: float
+    lng: float
 
 class SearchRequest(BaseModel):
     start: int
     end: int
 
-
 class SearchResult(BaseModel):
     option_id: int
-    renter_name: str
-    renter_phone: str
-    location: str
+    host_id: int
+    address: str
+    start: int
+    end: int
     price: float
-    reserved_start: int
-    reserved_end: int
-
+    lat: float
+    lng: float
 
 class ReserveRequest(BaseModel):
     option_id: int
     start: int
     end: int
 
-
 class ReserveResult(BaseModel):
     success: bool
     message: str
 
-
-options: List[Option] = []
-next_option_id = 1
-
-
-@app.post("/options", response_model=OptionOut)
-def create_option(opt: OptionCreate):
-    global next_option_id
+def posting_to_option(posting: dict) -> Option:
     o = Option()
-    o.id = next_option_id
-    o.renter = Renter(opt.renter_name, opt.renter_phone)
-    o.location = opt.location
-    o.price = opt.price
-    for itv in opt.intervals:
-        o.cal.addAvailable(itv.start, itv.end)
-    options.append(o)
-    next_option_id += 1
-    return OptionOut(
-        id=o.id,
-        renter_name=o.renter.name,
-        renter_phone=o.renter.phone,
-        location=o.location,
-        price=o.price,
-    )
+    o.id = posting["id"]
+    o.host_id = posting["host_id"]
+    o.address = posting["address"]
+    o.price = posting["price"]
+    o.lat = posting["lat"]
+    o.lng = posting["lng"]
 
+    cal = IntervalCalendar()
+    starts = posting.get("start") or []
+    ends = posting.get("end") or []
+
+    for s, e in zip(starts, ends):
+        cal.addAvailable(s, e)
+
+    o.cal = cal
+    return o
 
 @app.get("/options", response_model=List[OptionOut])
 def list_options():
+    postings = fetch()
     return [
         OptionOut(
-            id=o.id,
-            renter_name=o.renter.name,
-            renter_phone=o.renter.phone,
-            location=o.location,
-            price=o.price,
+            id=p["id"],
+            host_id=p["host_id"],
+            address=p["address"],
+            price=p["price"],
+            lat=p["lat"],
+            lng=p["lng"],
         )
-        for o in options
+        for p in postings
     ]
-
 
 @app.post("/search", response_model=List[SearchResult])
 def search(req: SearchRequest):
+    postings = fetch()
     results: List[SearchResult] = []
-    for o in options:
+    for p in postings:
+        o = posting_to_option(p)
         if o.cal.isAvailable(req.start, req.end):
             results.append(
                 SearchResult(
                     option_id=o.id,
-                    renter_name=o.renter.name,
-                    renter_phone=o.renter.phone,
-                    location=o.location,
+                    host_id=o.host_id,
+                    address=o.address,
+                    start=req.start,
+                    end=req.end,
                     price=o.price,
-                    reserved_start=req.start,
-                    reserved_end=req.end,
+                    lat=o.lat,
+                    lng=o.lng,
                 )
             )
     return results
 
-
 @app.post("/reserve", response_model=ReserveResult)
 def reserve(req: ReserveRequest):
-    target = None
-    for o in options:
-        if o.id == req.option_id:
-            target = o
-            break
-    if target is None:
+    postings = fetch()
+    posting = next((p for p in postings if p["id"] == req.option_id), None)
+    if posting is None:
         raise HTTPException(status_code=404, detail="Option not found")
-    ok = target.cal.reserve(req.start, req.end)
+    o = posting_to_option(posting)
+    ok = o.cal.reserve(req.start, req.end)
     if not ok:
         return ReserveResult(success=False, message="Not available for this interval")
     return ReserveResult(success=True, message="Reserved successfully")
-

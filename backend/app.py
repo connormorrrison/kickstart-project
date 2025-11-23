@@ -20,8 +20,8 @@ class PostingIn(BaseModel):
     lng: float
     price: float
     date: datetime.date # "yyyy-mm-dd"
-    start: List[int]
-    end: List[int]
+    start: int
+    end: int
 
 app = FastAPI()
 load_dotenv()
@@ -62,7 +62,19 @@ async def register(username: str, password_hash: str, email=None):
 async def postingsAll():
     return (supabase.table("postings")
     .select("*")
+    .is_("customer_id", "null")
     .execute()
+    )
+
+@app.get("/postings")
+async def postings(date:datetime.date, start_time:int, end_time:int):
+    return (
+        supabase.table("postings")
+        .select("*")
+        .eq("date", date)
+        .gte("start", start_time)
+        .lte("end", end_time)
+        .execute()
     )
 
 @app.post("/postings/create")
@@ -86,6 +98,13 @@ async def postingsCreate(posting: PostingIn):
         "end": posting.end
     })
     .execute())
+
+@app.post("/postings/book")
+async def postingsBook(posting_id:int, customer_id:int):
+  result = supabase.table("postings")\
+  .update({"customer_id":customer_id})\
+  .eq("id", posting_id)
+  return result
 
 @app.get("/user/get-info")
 async def userInfo(username:str, password_hash:str):

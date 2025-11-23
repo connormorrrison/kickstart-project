@@ -53,13 +53,12 @@ class IntervalCalendar:
         for L,R in self.intervals:
             sys.stdout.write("[" + str(L) + ", " + str(R) + ")\n")
         sys.stdout.write("--------------\n")
-class Renter:
-    def __init__(self,n="",p=""):
-        self.name=n
-        self.phone=p
 class Option:
     def __init__(self):
-        self.renter=Renter()
-        self.location=""
+        self.id = 0
+        self.host_id=0
+        self.address=""
         self.price=0.0
+        self.lat = 0.0
+        self.lng = 0.0
         self.cal=IntervalCalendar()
