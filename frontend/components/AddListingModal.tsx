@@ -1,14 +1,14 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { X, Upload } from 'lucide-react';
+import { useState, useMemo, useCallback } from 'react';
+import { X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import AvailabilityPicker from './AvailabilityPicker';
+import AddressMapPreview from './AddressMapPreview';
 
 interface AddListingModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onAddListing: (listing: { address: string; rate: number; availableStart: string; availableEnd: string; imagePreview: string | null }) => void;
 }
 
 interface TimeSlot {
@@ -29,40 +29,70 @@ interface BackendTimeSlot {
     end: number[]; // Array of end hours (24-hour format)
 }
 
-export default function AddListingModal({ isOpen, onClose, onAddListing }: AddListingModalProps) {
+export default function AddListingModal({ isOpen, onClose }: AddListingModalProps) {
     const [address, setAddress] = useState('');
     const [rate, setRate] = useState(10); // Default to $10
-    const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const [coordinates, setCoordinates] = useState({ lat: 49.2827, lng: -123.1207 }); // Default: Vancouver
     const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
 
     // Calculate booking likelihood (inverse of price)
     const bookingLikelihood = Math.round(100 - (rate / 20 * 100));
 
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setImagePreview(reader.result as string);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
+    const handleCoordinatesChange = useCallback((lat: number, lng: number) => {
+        setCoordinates({ lat, lng });
+    }, []);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        onAddListing({
-            address,
-            rate,
-            availableStart: '09:00', // Default for now
-            availableEnd: '17:00', // Default for now
-            imagePreview
-        });
-        // Reset form
-        setAddress('');
-        setRate(10);
-        setImagePreview(null);
-        setSelectedSlots(new Set());
+        setIsSubmitting(true);
+        setSubmitError(null);
+
+        try {
+            // Send each time range as a separate posting
+            const promises = backendFormattedData.map(async (timeRange) => {
+                const response = await fetch('http://localhost:8000/postings/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        username: 'testing1',
+                        password_hash: 'abc',
+                        address: address,
+                        lat: coordinates.lat,
+                        lng: coordinates.lng,
+                        price: rate,
+                        date: timeRange.date,
+                        start: timeRange.start,
+                        end: timeRange.end,
+                    }),
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Failed to create posting');
+                }
+
+                return response.json();
+            });
+
+            await Promise.all(promises);
+
+            // Success! Reset form and close modal
+            setAddress('');
+            setRate(10);
+            setCoordinates({ lat: 49.2827, lng: -123.1207 });
+            setSelectedSlots(new Set());
+            alert(`Successfully created ${backendFormattedData.length} listing(s)!`);
+            onClose();
+        } catch (error) {
+            console.error('Error creating listing:', error);
+            setSubmitError(error instanceof Error ? error.message : 'Failed to create listing');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     // Parse time slots and group consecutive hours into ranges
@@ -209,43 +239,6 @@ export default function AddListingModal({ isOpen, onClose, onAddListing }: AddLi
                 <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '20px' }}>Add New Listing</h2>
 
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    {/* Image Upload */}
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '1rem', fontWeight: 500 }}>Spot Image</label>
-                        <div
-                            style={{
-                                border: '2px dashed #e5e5e5',
-                                borderRadius: '12px',
-                                padding: '20px',
-                                textAlign: 'center',
-                                cursor: 'pointer',
-                                background: imagePreview ? `url(${imagePreview}) center/cover no-repeat` : '#f9f9f9',
-                                height: '200px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                position: 'relative',
-                                overflow: 'hidden'
-                            }}
-                            onClick={() => document.getElementById('image-upload')?.click()}
-                        >
-                            {!imagePreview && (
-                                <div style={{ color: '#666' }}>
-                                    <Upload size={32} style={{ margin: '0 auto 8px' }} />
-                                    <p style={{ fontWeight: 600, marginBottom: '4px' }}>Click to upload</p>
-                                    <p style={{ fontSize: '0.8rem' }}>JPG, PNG (Max 5MB)</p>
-                                </div>
-                            )}
-                            <input
-                                id="image-upload"
-                                type="file"
-                                accept="image/*"
-                                onChange={handleImageUpload}
-                                style={{ display: 'none' }}
-                            />
-                        </div>
-                    </div>
-
                     {/* Address */}
                     <div>
                         <label style={{ display: 'block', marginBottom: '8px', fontSize: '1rem', fontWeight: 500 }}>Address</label>
@@ -264,6 +257,12 @@ export default function AddListingModal({ isOpen, onClose, onAddListing }: AddLi
                             }}
                         />
                     </div>
+
+                    {/* Map Preview */}
+                    <AddressMapPreview
+                        address={address}
+                        onCoordinatesChange={handleCoordinatesChange}
+                    />
 
                     {/* Rate Slider */}
                     <div>
@@ -361,21 +360,37 @@ export default function AddListingModal({ isOpen, onClose, onAddListing }: AddLi
                         </div>
                     )}
 
+                    {submitError && (
+                        <div style={{
+                            background: '#fee2e2',
+                            border: '1px solid #fca5a5',
+                            color: '#dc2626',
+                            padding: '12px',
+                            borderRadius: '8px',
+                            fontSize: '0.9rem'
+                        }}>
+                            {submitError}
+                        </div>
+                    )}
+
                     <button
                         type="submit"
+                        disabled={selectedSlots.size === 0 || isSubmitting}
                         style={{
                             width: '100%',
-                            background: 'black',
+                            background: (selectedSlots.size === 0 || isSubmitting) ? '#d1d5db' : 'black',
                             color: 'white',
                             padding: '14px',
                             borderRadius: '8px',
                             fontWeight: 600,
                             fontSize: '1rem',
                             marginTop: '10px',
-                            cursor: 'pointer'
+                            cursor: (selectedSlots.size === 0 || isSubmitting) ? 'not-allowed' : 'pointer',
+                            opacity: (selectedSlots.size === 0 || isSubmitting) ? 0.6 : 1,
+                            transition: 'all 0.2s'
                         }}
                     >
-                        Add Listing
+                        {isSubmitting ? 'Creating listings...' : selectedSlots.size === 0 ? 'Select availability to continue' : 'Add Listing'}
                     </button>
                 </form>
             </motion.div>

@@ -3,6 +3,7 @@
 import { useStore } from '@/lib/store';
 import { X, Star, MapPin, Clock, Shield } from 'lucide-react';
 import { motion } from 'framer-motion';
+import MapPreview from './MapPreview';
 
 export default function SpotDetail() {
     const { selectedSpot, setSelectedSpot, user, setAuthModalOpen } = useStore();
@@ -63,11 +64,7 @@ export default function SpotDetail() {
                 }}
             >
                 <div style={{ position: 'relative', height: '250px' }}>
-                    <img
-                        src={selectedSpot.images[0]}
-                        alt={selectedSpot.title}
-                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                    />
+                    <MapPreview lat={selectedSpot.lat} lng={selectedSpot.lng} height="250px" />
                     <button
                         onClick={() => setSelectedSpot(null)}
                         style={{
@@ -81,7 +78,8 @@ export default function SpotDetail() {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                            zIndex: 10
                         }}
                     >
                         <X size={18} />
