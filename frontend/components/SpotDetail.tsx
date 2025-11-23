@@ -3,21 +3,18 @@
 import { useStore } from '@/lib/store';
 import { X, Star, MapPin, Clock, Shield } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 import MapPreview from './MapPreview';
 
 export default function SpotDetail() {
     const { selectedSpot, setSelectedSpot, user, setAuthModalOpen } = useStore();
 
+    const router = useRouter();
+
     if (!selectedSpot) return null;
 
     const handleBook = () => {
-        if (!user) {
-            // Trigger auth flow
-            setAuthModalOpen(true);
-            // In a real app, we'd set an auth modal state here
-        } else {
-            alert('Proceeding to payment...');
-        }
+        router.push('/user/payment');
     };
 
     return (
