@@ -19,6 +19,7 @@ class PostingIn(BaseModel):
     lat: float
     lng: float
     price: float
+    date: datetime.date # "yyyy-mm-dd"
     start: List[int]
     end: List[int]
 
@@ -79,6 +80,7 @@ async def postingsCreate(posting: PostingIn):
         "address": posting.address,
         "lat": posting.lat,
         "lng": posting.lng,
+        "date": posting.date.isoformat(),
         "price": posting.price,
         "start": posting.start,
         "end": posting.end
