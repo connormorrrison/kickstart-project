@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import MapComponent from '@/components/MapComponent';
 import SearchOverlay from '@/components/SearchOverlay';
 import SpotDetail from '@/components/SpotDetail';
@@ -7,7 +8,11 @@ import AuthModal from '@/components/AuthModal';
 import { useStore } from '@/lib/store';
 
 export default function Home() {
-  const { selectedSpot, setSelectedSpot, spots, searchCriteria } = useStore();
+  const { selectedSpot, setSelectedSpot, spots, searchCriteria, fetchSpots } = useStore();
+
+  useEffect(() => {
+    fetchSpots();
+  }, [fetchSpots]);
 
   // Filter spots based on time and date availability
   const filteredSpots = spots.filter(spot => {
