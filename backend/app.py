@@ -88,12 +88,12 @@ async def postingsCreate(posting: PostingIn):
     })
     .execute())
 
-# @app.post("/postings/book")
-# async def postingsBook(posting_id:int, customer_id:int):
-#   result = supabase.table("postings")\
-#   .select
-#   result = None
-#   return result
+@app.post("/postings/book")
+async def postingsBook(posting_id:int, customer_id:int):
+  result = supabase.table("postings")\
+  .update({"customer_id":customer_id})\
+  .eq("id", posting_id)
+  return result
 
 @app.get("/user/get-info")
 async def userInfo(username:str, password_hash:str):
