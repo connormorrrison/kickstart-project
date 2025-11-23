@@ -1,39 +1,44 @@
+'use client';
+
 import { create } from 'zustand';
-
-interface SearchCriteria {
-  date: string;
-  startTime: string;
-  endTime: string;
-}
-
-interface User {
-  name: string;
-  email: string;
-}
+import { ParkingSpot, User } from '@/types';
+import { MOCK_SPOTS } from './mockData';
 
 interface AppState {
-  searchCriteria: SearchCriteria;
-  setSearchCriteria: (criteria: Partial<SearchCriteria>) => void;
-  user: User | null;
-  authModalOpen: boolean;
-  setAuthModalOpen: (isOpen: boolean) => void;
+    user: User | null;
+    setUser: (user: User | null) => void;
+    spots: ParkingSpot[];
+    addSpot: (spot: ParkingSpot) => void;
+    selectedSpot: ParkingSpot | null;
+    setSelectedSpot: (spot: ParkingSpot | null) => void;
+    searchCriteria: {
+        location: string;
+        date: string;
+        startTime: string;
+        endTime: string;
+    };
+    setSearchCriteria: (criteria: Partial<AppState['searchCriteria']>) => void;
+    isAuthModalOpen: boolean;
+    setAuthModalOpen: (isOpen: boolean) => void;
 }
 
 export const useStore = create<AppState>((set) => ({
-  // initial state
-  searchCriteria: {
-    date: '',
-    startTime: '09:00',
-    endTime: '17:00',
-  },
-  user: null, // set to { name: 'Connor', email: '...' } to test logged in state
-  authModalOpen: false,
-
-  // actions
-  setSearchCriteria: (newCriteria) =>
-    set((state) => ({
-      searchCriteria: { ...state.searchCriteria, ...newCriteria },
-    })),
-
-  setAuthModalOpen: (isOpen) => set({ authModalOpen: isOpen }),
+    user: null,
+    setUser: (user) => set({ user }),
+    spots: MOCK_SPOTS,
+    addSpot: (spot) => set((state) => ({ spots: [...state.spots, spot] })),
+    selectedSpot: null,
+    setSelectedSpot: (selectedSpot) => set({ selectedSpot }),
+    searchCriteria: {
+        location: '',
+        date: new Date().toISOString().split('T')[0],
+        startTime: '09:00',
+        endTime: '17:00',
+    },
+    setSearchCriteria: (criteria) =>
+        set((state) => ({
+            searchCriteria: { ...state.searchCriteria, ...criteria },
+        })),
+    isAuthModalOpen: false,
+    setAuthModalOpen: (isOpen) => set({ isAuthModalOpen: isOpen }),
 }));
