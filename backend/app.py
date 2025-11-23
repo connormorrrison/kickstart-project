@@ -43,21 +43,22 @@ async def ping():
 
 @app.post("/login")
 async def login(username: str, password_hash: str):
-    return {"message": f"name: {username}, pwd: {password_hash}"}
+    return {"message": f"username: {username}, password_hash: {password_hash}"}
 
 @app.post("/register")
 async def register(username: str, password_hash: str, email=None):
-    result = supabase.table("users")\
-    .insert({
-        "username":username,
-        "passwordHash":password_hash,
-        "email":email
-    })\
-    .execute()
+    result = (supabase.table("users")
+        .insert({
+            "username":username,
+            "passwordHash":password_hash,
+            "email":email
+        })
+        .execute()
+    )
     return result
 
-@app.get("/postings")
-async def postings():
+@app.get("/postings/all")
+async def postingsAll():
     return (supabase.table("postings")
     .select("*")
     .execute()
@@ -84,7 +85,24 @@ async def postingsCreate(posting: PostingIn):
     })
     .execute())
 
-@app.get("/user/id")
+@app.get("/user/get-info")
+async def userInfo(username:str, password_hash:str):
+    userId: int = await _getUserId(username, password_hash)
+    if not userId:
+        raise HTTPException(
+            status_code=400,
+            detail="user not found"
+        )
+    return (supabase.table("users")
+            .select("*")
+            .eq("id", userId)
+            .maybe_single()
+            .execute()
+            )
+
+
+
+@app.get("/user/get-id")
 async def userId(username:str, password_hash: str):
     return {"id":await _getUserId(username, password_hash)}
 
