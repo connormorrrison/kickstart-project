@@ -41,7 +41,7 @@ export default function SearchOverlay() {
   };
 
   return (
-    <Tile className="absolute left-5 top-5 z-10 w-[350px] p-5">
+    <Tile className="absolute left-5 top-5 z-10 w-[350px] p-5 shadow-xl">
       <div className="flex items-center justify-between">
         <h2 className="text-xl text-left font-medium">Find Parking</h2>
         <Button2 icon={<User />}>Sign In</Button2>
@@ -97,7 +97,7 @@ export default function SearchOverlay() {
           <div className="min-h-0">
             {displaySpot && (
               <>
-                <Tile className="p-4 mt-4 shadow-none bg-gray-50">
+                <Tile className="p-4 mt-2 shadow-none bg-gray-50">
                   <div className="space-y-4">
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-3">

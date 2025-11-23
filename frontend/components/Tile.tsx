@@ -6,7 +6,7 @@ type TileProps = ComponentPropsWithoutRef<typeof Card>;
 export default function Tile({ className, ...props }: TileProps) {
   return (
     <Card
-      className={`shadow-xl ${className || ''}`}
+      className={`shadow-none ${className || ''}`}
       {...props}
     />
   );
