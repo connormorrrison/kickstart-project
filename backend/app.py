@@ -125,3 +125,80 @@ async def _getUserId(username:str, passwordHash: str) -> int:
     .execute()
     )
     return response.data["id"] if response else response
+
+class Spot(BaseModel):
+    id: str
+    title: str
+    description: str
+    address: str
+    lat: float
+    lng: float
+    pricePerHour: float
+    hostId: str
+    availableStart: str
+    availableEnd: str
+    availableDateStart: str
+    availableDateEnd: str
+    images: List[str]
+
+@app.get("/spots")
+async def get_spots():
+    response = supabase.table("postings").select("*").execute()
+    spots = []
+    for p in response.data:
+        # Map DB fields to frontend Spot model
+        # Handle missing fields with defaults
+        start_hour = p.get("start", 0)
+        end_hour = p.get("end", 23)
+        
+        spot = Spot(
+            id=str(p["id"]),
+            title=f"Parking at {p['address']}", # Default title
+            description="Available for booking.", # Default description
+            address=p["address"],
+            lat=p["lat"],
+            lng=p["lng"],
+            pricePerHour=p["price"],
+            hostId=str(p["host_id"]),
+            availableStart=f"{start_hour:02d}:00",
+            availableEnd=f"{end_hour:02d}:00",
+            availableDateStart=p["date"],
+            availableDateEnd=p["date"], # DB only has single date
+            images=["https://images.unsplash.com/photo-1506521781263-d8422e82f27a?w=800&auto=format&fit=crop&q=60"] # Default image
+        )
+        spots.append(spot)
+    return spots
+
+@app.post("/spots")
+async def create_spot(spot: Spot):
+    # Map frontend Spot model to DB fields
+    # Parse times to integers (hours)
+    try:
+        start = int(spot.availableStart.split(':')[0])
+    except:
+        start = 0
+        
+    try:
+        end = int(spot.availableEnd.split(':')[0])
+    except:
+        end = 23
+        
+    # Handle host_id
+    try:
+        host_id = int(spot.hostId)
+    except:
+        host_id = 1 # Fallback to existing user 1 if invalid
+        
+    data = {
+        "host_id": host_id,
+        "address": spot.address,
+        "lat": spot.lat,
+        "lng": spot.lng,
+        "date": spot.availableDateStart, # Use start date
+        "price": spot.pricePerHour,
+        "start": start,
+        "end": end
+    }
+    
+    result = supabase.table("postings").insert(data).execute()
+    return result
