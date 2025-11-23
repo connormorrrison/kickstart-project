@@ -25,8 +25,8 @@ interface GroupedTimeRange {
 
 interface BackendTimeSlot {
     date: string; // yyyy-mm-dd format
-    start: number[]; // Array of start hours (24-hour format)
-    end: number[]; // Array of end hours (24-hour format)
+    start: number; // Start hour as integer (24-hour format)
+    end: number; // End hour as integer (24-hour format)
 }
 
 export default function AddListingModal({ isOpen, onClose }: AddListingModalProps) {
@@ -184,7 +184,7 @@ export default function AddListingModal({ isOpen, onClose }: AddListingModalProp
     }
 
     // Convert selected slots to backend format
-    // Each time range becomes one posting with start: [startHour], end: [endHour]
+    // Each time range becomes one posting with start: int, end: int
     const backendFormattedData = useMemo(() => {
         return groupedTimeRanges.map(range => {
             const date = getNextDateForDay(range.day);
@@ -193,8 +193,8 @@ export default function AddListingModal({ isOpen, onClose }: AddListingModalProp
 
             return {
                 date,
-                start: [startHour],  // Single-element array
-                end: [endHour]       // Single-element array
+                start: startHour,  // Integer (not array)
+                end: endHour       // Integer (not array)
             };
         });
     }, [groupedTimeRanges]);
