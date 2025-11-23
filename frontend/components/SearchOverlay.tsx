@@ -115,14 +115,14 @@ export default function SearchOverlay() {
                       <button onClick={() => setSelectedSpot(null)} className="text-gray-500 hover:text-gray-700">✕</button>
                     </div>
 
-                    <div className="flex items-center gap-2 text-base text-gray-600">
-                      <MapPin size={16} />
-                      <span>{displaySpot.address}</span>
+                    <div>
+                      <Title2>Address</Title2>
+                      <div className="text-base font-normal text-gray-600">{displaySpot.address}</div>
                     </div>
 
                     <div>
-                      <div className="text-base text-gray-600 mb-1">Full availability</div>
-                      <div className="text-base font-normal">
+                      <Title2>Full Availability</Title2>
+                      <div className="text-base font-normal text-gray-600">
                         <div>Monday - Sunday</div>
                         <div>
                           {displaySpot.availabilityIntervals && displaySpot.availabilityIntervals.length > 0
@@ -138,25 +138,13 @@ export default function SearchOverlay() {
                       </div>
                     </div>
 
-                    {date && (
-                      <div className="bg-blue-50 p-3 rounded-lg">
-                        <div className="text-base font-normal text-blue-900 mb-1">Selected time</div>
-                        <div className="text-base font-normal text-blue-800">
-                          {date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-                        </div>
-                        <div className="text-base font-normal text-blue-800">
-                          {startTime} - {endTime}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="pt-4 border-t border-gray-200">
-                      <div className="text-base text-gray-600 mb-1">Hourly rate</div>
-                      <div className="text-base font-normal">${displaySpot.pricePerHour}/hour</div>
+                    <div>
+                      <Title2>Hourly Rate</Title2>
+                      <div className="text-base font-normal text-gray-600">${displaySpot.pricePerHour}/hour</div>
                     </div>
                   </div>
                 </Tile>
-                <Button1 onClick={handleBook} className="w-full mt-4 pb-1">Proceed to Payment</Button1>
+                <Button1 onClick={handleBook} className="w-full mt-6">Proceed to Payment</Button1>
               </>
             )}
           </div>
