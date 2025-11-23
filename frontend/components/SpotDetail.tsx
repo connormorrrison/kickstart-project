@@ -104,6 +104,11 @@ export default function SpotDetail() {
                             <Clock size={20} style={{ marginBottom: '8px', color: '#666' }} />
                             <div style={{ fontSize: '0.8rem', color: '#666' }}>Available</div>
                             <div style={{ fontWeight: 600 }}>{selectedSpot.availableStart} - {selectedSpot.availableEnd}</div>
+                            {selectedSpot.availableDateStart && (
+                                <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '4px' }}>
+                                    {new Date(selectedSpot.availableDateStart + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                                </div>
+                            )}
                         </div>
                         <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px', flex: 1 }}>
                             <Shield size={20} style={{ marginBottom: '8px', color: '#666' }} />

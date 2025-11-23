@@ -8,14 +8,14 @@ import AuthModal from '@/components/AuthModal';
 import { useStore } from '@/lib/store';
 
 export default function Home() {
-  const { selectedSpot, setSelectedSpot, spots, searchCriteria, fetchSpots } = useStore();
+  const { selectedSpot, setSelectedSpot, spots, searchCriteria, fetchSpots, isFilterActive } = useStore();
 
   useEffect(() => {
     fetchSpots();
   }, [fetchSpots]);
 
   // Filter spots based on time and date availability
-  const filteredSpots = spots.filter(spot => {
+  const filteredSpots = isFilterActive ? spots.filter(spot => {
     // Check time availability
     const isTimeAvailable = spot.availableStart <= searchCriteria.startTime &&
       spot.availableEnd >= searchCriteria.endTime;
@@ -28,7 +28,7 @@ export default function Home() {
     }
 
     return isTimeAvailable && isDateAvailable;
-  });
+  }) : spots;
 
   return (
     <main style={{ height: '100vh', width: '100vw', position: 'relative', overflow: 'hidden' }}>

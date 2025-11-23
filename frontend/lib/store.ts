@@ -18,6 +18,8 @@ interface AppState {
         endTime: string;
     };
     setSearchCriteria: (criteria: Partial<AppState['searchCriteria']>) => void;
+    isFilterActive: boolean;
+    setFilterActive: (isActive: boolean) => void;
     isAuthModalOpen: boolean;
     setAuthModalOpen: (isOpen: boolean) => void;
     fetchSpots: () => Promise<void>;
@@ -46,6 +48,8 @@ export const useStore = create<AppState>((set) => ({
         set((state) => ({
             searchCriteria: { ...state.searchCriteria, ...criteria },
         })),
+    isFilterActive: false,
+    setFilterActive: (isActive) => set({ isFilterActive: isActive }),
     isAuthModalOpen: false,
     setAuthModalOpen: (isOpen) => set({ isAuthModalOpen: isOpen }),
     fetchSpots: async () => {

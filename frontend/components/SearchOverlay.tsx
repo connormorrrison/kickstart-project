@@ -1,11 +1,40 @@
 'use client';
 
+import { useState, useEffect } from 'react';
+
 import { useStore } from '@/lib/store';
 import { Calendar, Clock, User as UserIcon } from 'lucide-react';
 import Button1 from './Button1';
 
 export default function SearchOverlay() {
-    const { searchCriteria, setSearchCriteria, setAuthModalOpen } = useStore();
+    const { searchCriteria, setSearchCriteria, setAuthModalOpen, setFilterActive } = useStore();
+    const [localDate, setLocalDate] = useState(searchCriteria.date);
+    const [localStartTime, setLocalStartTime] = useState(searchCriteria.startTime);
+    const [localEndTime, setLocalEndTime] = useState(searchCriteria.endTime);
+
+    // Sync local state if store changes externally (optional but good practice)
+    useEffect(() => {
+        setLocalDate(searchCriteria.date);
+        setLocalStartTime(searchCriteria.startTime);
+        setLocalEndTime(searchCriteria.endTime);
+    }, [searchCriteria]);
+
+    const [isLoading, setIsLoading] = useState(false);
+    const [isHovered, setIsHovered] = useState(false);
+
+    const handleSearch = async () => {
+        setIsLoading(true);
+        // Simulate loading delay for better UX
+        await new Promise(resolve => setTimeout(resolve, 600));
+
+        setSearchCriteria({
+            date: localDate,
+            startTime: localStartTime,
+            endTime: localEndTime
+        });
+        setFilterActive(true);
+        setIsLoading(false);
+    };
 
     return (
         <div style={{
@@ -37,8 +66,8 @@ export default function SearchOverlay() {
                             <Calendar size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#666' }} />
                             <input
                                 type="date"
-                                value={searchCriteria.date}
-                                onChange={(e) => setSearchCriteria({ date: e.target.value })}
+                                value={localDate}
+                                onChange={(e) => setLocalDate(e.target.value)}
                                 style={{
                                     width: '100%',
                                     padding: '8px 8px 8px 32px',
@@ -58,8 +87,8 @@ export default function SearchOverlay() {
                             <Clock size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#666' }} />
                             <input
                                 type="time"
-                                value={searchCriteria.startTime}
-                                onChange={(e) => setSearchCriteria({ startTime: e.target.value })}
+                                value={localStartTime}
+                                onChange={(e) => setLocalStartTime(e.target.value)}
                                 style={{
                                     width: '100%',
                                     padding: '8px 8px 8px 32px',
@@ -76,8 +105,8 @@ export default function SearchOverlay() {
                             <Clock size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#666' }} />
                             <input
                                 type="time"
-                                value={searchCriteria.endTime}
-                                onChange={(e) => setSearchCriteria({ endTime: e.target.value })}
+                                value={localEndTime}
+                                onChange={(e) => setLocalEndTime(e.target.value)}
                                 style={{
                                     width: '100%',
                                     padding: '8px 8px 8px 32px',
@@ -90,18 +119,49 @@ export default function SearchOverlay() {
                     </div>
                 </div>
 
-                <button style={{
-                    background: 'black',
-                    color: 'white',
-                    padding: '12px',
-                    borderRadius: '8px',
-                    fontWeight: 500,
-                    marginTop: '5px',
-                    transition: 'opacity 0.2s',
-                    fontSize: '1rem'
-                }}>
-                    Search
+                <button
+                    onClick={handleSearch}
+                    disabled={isLoading}
+                    onMouseEnter={() => setIsHovered(true)}
+                    onMouseLeave={() => setIsHovered(false)}
+                    style={{
+                        background: isHovered ? '#333' : 'black',
+                        color: 'white',
+                        padding: '12px',
+                        borderRadius: '8px',
+                        fontWeight: 500,
+                        marginTop: '5px',
+                        transition: 'all 0.2s ease',
+                        fontSize: '1rem',
+                        cursor: isLoading ? 'wait' : 'pointer',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: '8px',
+                        opacity: isLoading ? 0.8 : 1
+                    }}>
+                    {isLoading ? (
+                        <>
+                            <div style={{
+                                width: '16px',
+                                height: '16px',
+                                border: '2px solid white',
+                                borderTop: '2px solid transparent',
+                                borderRadius: '50%',
+                                animation: 'spin 1s linear infinite'
+                            }} />
+                            Searching...
+                        </>
+                    ) : (
+                        'Search'
+                    )}
                 </button>
+                <style jsx>{`
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                `}</style>
             </div>
         </div>
     );

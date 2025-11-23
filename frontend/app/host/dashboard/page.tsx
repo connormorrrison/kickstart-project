@@ -168,65 +168,65 @@ export default function HostDashboard() {
                 ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' }}>
                         {listings.map((listing) => (
-                        <div
-                            key={listing.id}
-                            style={{
-                                position: 'relative',
-                                overflow: 'hidden',
-                                borderRadius: '12px',
-                                border: '1px solid #e5e7eb',
-                                background: 'white',
-                                boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-                                transition: 'box-shadow 0.2s'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)'}
-                            onMouseLeave={(e) => e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)'}
-                        >
-                            {/* status badge */}
-                            <div style={{ position: 'absolute', right: '12px', top: '12px', zIndex: 10 }}>
-                                <span style={{
-                                    borderRadius: '9999px',
-                                    padding: '2px 10px',
-                                    fontSize: '0.75rem',
-                                    fontWeight: 500,
-                                    background: listing.status === 'active' ? '#d1fae5' : '#f3f4f6',
-                                    color: listing.status === 'active' ? '#047857' : '#4b5563'
-                                }}>
-                                    {listing.status === 'active' ? 'Active' : 'Inactive'}
-                                </span>
-                            </div>
-
-                            {/* map preview */}
-                            <div style={{ height: '160px', width: '100%', overflow: 'hidden' }}>
-                                <MapPreview lat={listing.lat} lng={listing.lng} height="160px" />
-                            </div>
-
-                            {/* content */}
-                            <div style={{ padding: '20px' }}>
-                                <h3 style={{ fontWeight: 600, color: '#111827' }}>{listing.address}</h3>
-
-                                <button
-                                    onClick={() => setSelectedListing(listing)}
-                                    style={{
-                                        marginTop: '16px',
-                                        width: '100%',
-                                        borderRadius: '6px',
-                                        border: '1px solid #e5e7eb',
-                                        background: 'transparent',
-                                        padding: '8px',
-                                        fontSize: '0.875rem',
+                            <div
+                                key={listing.id}
+                                style={{
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    borderRadius: '12px',
+                                    border: '1px solid #e5e7eb',
+                                    background: 'white',
+                                    boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                                    transition: 'box-shadow 0.2s'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)'}
+                                onMouseLeave={(e) => e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)'}
+                            >
+                                {/* status badge */}
+                                <div style={{ position: 'absolute', right: '12px', top: '12px', zIndex: 10 }}>
+                                    <span style={{
+                                        borderRadius: '9999px',
+                                        padding: '2px 10px',
+                                        fontSize: '0.75rem',
                                         fontWeight: 500,
-                                        color: '#374151',
-                                        transition: 'background 0.2s',
-                                        cursor: 'pointer'
-                                    }}
-                                    onMouseEnter={(e) => e.currentTarget.style.background = '#f9fafb'}
-                                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                                >
-                                    View Details
-                                </button>
+                                        background: listing.status === 'active' ? '#d1fae5' : '#f3f4f6',
+                                        color: listing.status === 'active' ? '#047857' : '#4b5563'
+                                    }}>
+                                        {listing.status === 'active' ? 'Active' : 'Inactive'}
+                                    </span>
+                                </div>
+
+                                {/* map preview */}
+                                <div style={{ height: '160px', width: '100%', overflow: 'hidden' }}>
+                                    <MapPreview lat={listing.lat} lng={listing.lng} height="160px" />
+                                </div>
+
+                                {/* content */}
+                                <div style={{ padding: '20px' }}>
+                                    <h3 style={{ fontWeight: 600, color: '#111827' }}>{listing.address}</h3>
+
+                                    <button
+                                        onClick={() => setSelectedListing(listing)}
+                                        style={{
+                                            marginTop: '16px',
+                                            width: '100%',
+                                            borderRadius: '6px',
+                                            border: '1px solid #e5e7eb',
+                                            background: 'transparent',
+                                            padding: '8px',
+                                            fontSize: '0.875rem',
+                                            fontWeight: 500,
+                                            color: '#374151',
+                                            transition: 'background 0.2s',
+                                            cursor: 'pointer'
+                                        }}
+                                        onMouseEnter={(e) => e.currentTarget.style.background = '#f9fafb'}
+                                        onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                                    >
+                                        View Details
+                                    </button>
+                                </div>
                             </div>
-                        </div>
                         ))}
                     </div>
                 )}
