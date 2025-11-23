@@ -20,8 +20,8 @@ class PostingIn(BaseModel):
     lng: float
     price: float
     date: datetime.date # "yyyy-mm-dd"
-    start: List[int]
-    end: List[int]
+    start: int
+    end: int
 
 app = FastAPI()
 load_dotenv()
@@ -64,6 +64,17 @@ async def postingsAll():
     .select("*")
     .is_("customer_id", "null")
     .execute()
+    )
+
+@app.get("/postings")
+async def postings(date:datetime.date, start_time:int, end_time:int):
+    return (
+        supabase.table("postings")
+        .select("*")
+        .eq("date", date)
+        .gte("start", start_time)
+        .lte("end", end_time)
+        .execute()
     )
 
 @app.post("/postings/create")
