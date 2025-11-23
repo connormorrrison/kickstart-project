@@ -62,6 +62,7 @@ async def register(username: str, password_hash: str, email=None):
 async def postingsAll():
     return (supabase.table("postings")
     .select("*")
+    .is_("customer_id", "null")
     .execute()
     )
 
@@ -86,6 +87,13 @@ async def postingsCreate(posting: PostingIn):
         "end": posting.end
     })
     .execute())
+
+# @app.post("/postings/book")
+# async def postingsBook(posting_id:int, customer_id:int):
+#   result = supabase.table("postings")\
+#   .select
+#   result = None
+#   return result
 
 @app.get("/user/get-info")
 async def userInfo(username:str, password_hash:str):
