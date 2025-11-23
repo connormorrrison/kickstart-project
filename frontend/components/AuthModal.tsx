@@ -2,29 +2,42 @@
 
 import { useState } from 'react';
 import { useStore } from '@/lib/store';
+import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
+
+const HOST_EMAIL = 'host@example.com';
+const HOST_PASSWORD = 'password123';
 
 export default function AuthModal() {
     const { isAuthModalOpen, setAuthModalOpen, setUser } = useStore();
+    const router = useRouter();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState('');
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
+        setError('');
 
-        // Mock login delay
+        // Check hardcoded credentials
         setTimeout(() => {
-            setUser({
-                id: 'user1',
-                name: 'Demo User',
-                email: email,
-                isHost: false
-            });
-            setAuthModalOpen(false);
-            setIsLoading(false);
+            if (email === HOST_EMAIL && password === HOST_PASSWORD) {
+                setUser({
+                    id: 'host1',
+                    name: 'Host User',
+                    email: email,
+                    isHost: true
+                });
+                setAuthModalOpen(false);
+                setIsLoading(false);
+                router.push('/host/dashboard');
+            } else {
+                setError('Invalid email or password');
+                setIsLoading(false);
+            }
         }, 1000);
     };
 
@@ -63,11 +76,14 @@ export default function AuthModal() {
                     <X size={20} />
                 </button>
 
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '20px', textAlign: 'center' }}>Welcome Back</h2>
+                <div style={{ textAlign: 'center', marginBottom: '25px' }}>
+                    <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '8px' }}>Host Sign In</h2>
+                    <p style={{ fontSize: '1rem', color: '#666' }}>Sign in to manage your parking spots and reservations</p>
+                </div>
 
                 <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                     <div>
-                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.9rem', fontWeight: 500 }}>Email</label>
+                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '1rem', fontWeight: 500 }}>Email</label>
                         <input
                             type="email"
                             required
@@ -83,7 +99,7 @@ export default function AuthModal() {
                         />
                     </div>
                     <div>
-                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '0.9rem', fontWeight: 500 }}>Password</label>
+                        <label style={{ display: 'block', marginBottom: '6px', fontSize: '1rem', fontWeight: 500 }}>Password</label>
                         <input
                             type="password"
                             required
@@ -98,6 +114,19 @@ export default function AuthModal() {
                             }}
                         />
                     </div>
+
+                    {error && (
+                        <div style={{
+                            padding: '12px',
+                            background: '#fee',
+                            color: '#c00',
+                            borderRadius: '8px',
+                            fontSize: '0.9rem',
+                            textAlign: 'center'
+                        }}>
+                            {error}
+                        </div>
+                    )}
 
                     <button
                         type="submit"
