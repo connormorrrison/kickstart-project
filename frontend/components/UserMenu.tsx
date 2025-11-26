@@ -131,7 +131,7 @@ export default function UserMenu({ onSignOut, showDashboard = true }: UserMenuPr
           className="absolute top-full right-0 w-56 z-50 animate-in fade-in-0 zoom-in-95 slide-in-from-top-2"
           style={{ marginTop: '4px' }}
         >
-          <Tile className="bg-white p-2 shadow-xl border border-gray-200 rounded-xl">
+          <Tile className="bg-white p-2 shadow-none border border-gray-200 rounded-xl">
             <div className="flex flex-col gap-1">
               {showDashboard && (
                 <button

@@ -4,9 +4,10 @@ import { useStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, CreditCard, Calendar, Clock, MapPin, ShieldCheck } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { formatAddress } from '@/lib/addressUtils';
 
 export default function PaymentPage() {
-    const { selectedSpot } = useStore();
+    const { selectedSpot, searchCriteria } = useStore();
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
 
@@ -160,9 +161,9 @@ export default function PaymentPage() {
                             <h2 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '20px' }}>Booking Summary</h2>
 
                             <div style={{ marginBottom: '20px' }}>
-                                <div style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '4px' }}>{selectedSpot.title}</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '4px' }}>Parking Spot</div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#6b7280', fontSize: '0.9rem' }}>
-                                    <MapPin size={14} /> {selectedSpot.address}
+                                    <MapPin size={14} /> {formatAddress(selectedSpot)}
                                 </div>
                             </div>
 
@@ -172,14 +173,14 @@ export default function PaymentPage() {
                                         <Calendar size={18} /> Date
                                     </div>
                                     <div style={{ fontWeight: 500 }}>
-                                        {selectedSpot.availableDateStart ? new Date(selectedSpot.availableDateStart + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Today'}
+                                        {searchCriteria.date ? new Date(searchCriteria.date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Today'}
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#374151' }}>
                                         <Clock size={18} /> Time
                                     </div>
-                                    <div style={{ fontWeight: 500 }}>{selectedSpot.availableStart} - {selectedSpot.availableEnd}</div>
+                                    <div style={{ fontWeight: 500 }}>{searchCriteria.startTime || 'N/A'} - {searchCriteria.endTime || 'N/A'}</div>
                                 </div>
                             </div>
 

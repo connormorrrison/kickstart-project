@@ -1,7 +1,7 @@
 'use client';
 
 import { useStore } from '@/lib/store';
-import { Star, MapPin } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatAddress, formatShortAddress } from '@/lib/addressUtils';
 
@@ -48,30 +48,8 @@ export default function SpotList() {
                         }}
                         onClick={() => setSelectedSpot(spot)}
                     >
-                        <div style={{ height: '150px', overflow: 'hidden', position: 'relative' }}>
-                            <img
-                                src={spot.images[0]}
-                                alt={spot.title}
-                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            />
-                            <div style={{
-                                position: 'absolute',
-                                top: '10px',
-                                right: '10px',
-                                background: 'white',
-                                padding: '4px 8px',
-                                borderRadius: '20px',
-                                fontSize: '0.8rem',
-                                fontWeight: 600,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px'
-                            }}>
-                                <Star size={12} fill="black" /> 4.8
-                            </div>
-                        </div>
                         <div style={{ padding: '15px' }}>
-                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '4px' }}>{spot.title}</h3>
+                            <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '4px' }}>Parking Spot</h3>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#666', fontSize: '0.85rem', marginBottom: '10px' }}>
                                 <MapPin size={14} />
                                 <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{formatShortAddress(spot)}</span>

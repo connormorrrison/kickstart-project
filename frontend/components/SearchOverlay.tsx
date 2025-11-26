@@ -147,7 +147,7 @@ export default function SearchOverlay() {
 
   return (
     <PopInOutEffect isVisible={isVisible} className="absolute left-5 top-5 z-10 max-h-[calc(100vh-40px)]">
-      <Tile className="w-[350px] p-[24px] shadow-xl overflow-y-auto max-h-[calc(100vh-40px)]">
+      <Tile className="w-[350px] p-[24px] overflow-y-auto max-h-[calc(100vh-40px)]">
       <div className="flex flex-col gap-[24px]">
         <h2 className="text-xl text-left font-medium">Find Parking</h2>
 
