@@ -34,23 +34,39 @@ const formatTime = (time: string) => {
   return `${hours}:${minutes} ${formattedPeriod}`.trim();
 };
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+interface AvailableSlot {
+  start_time: string;
+  end_time: string;
+}
+
+interface AvailabilityData {
+  date: string;
+  day: string;
+  available_slots: AvailableSlot[];
+}
+
 export default function SearchOverlay() {
   const router = useRouter();
   const [date, setDate] = React.useState<Date | undefined>(undefined);
-  
-  // Default values could be set here if you wanted, e.g. '09:00', '17:00'
+
   const [startTime, setStartTime] = React.useState('');
   const [endTime, setEndTime] = React.useState('');
-  
+
   const [isDatePickerOpen, setIsDatePickerOpen] = React.useState(false);
   const [isVisible, setIsVisible] = React.useState(false);
   const [isSearchActive, setIsSearchActive] = React.useState(false);
+  const [availability, setAvailability] = React.useState<AvailabilityData | null>(null);
+  const [isLoadingAvailability, setIsLoadingAvailability] = React.useState(false);
 
   const { selectedSpot, setSelectedSpot, user, setAuthModalOpen, setSearchCriteria } = useStore();
 
   React.useEffect(() => {
     setIsVisible(true);
-  }, []);
+    // RESET: Ensure we start small (no selected spot) whenever this component mounts
+    setSelectedSpot(null);
+  }, [setSelectedSpot]);
 
   const [displaySpot, setDisplaySpot] = React.useState(selectedSpot);
 
@@ -63,13 +79,42 @@ export default function SearchOverlay() {
     }
   }, [selectedSpot]);
 
-  // Update handleBook to proceed regardless of search inputs
+  // Fetch calculated availability when spot is selected
+  React.useEffect(() => {
+    if (!selectedSpot) {
+      setAvailability(null);
+      return;
+    }
+
+    // Use selected date if available, otherwise use today
+    const dateToCheck = date?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0];
+
+    const fetchAvailability = async () => {
+      setIsLoadingAvailability(true);
+      try {
+        const response = await fetch(`${API_URL}/spots/${selectedSpot.id}/availability/${dateToCheck}`);
+        if (response.ok) {
+          const data = await response.json();
+          setAvailability(data);
+        } else {
+          console.error('Failed to fetch availability:', response.status);
+          setAvailability(null);
+        }
+      } catch (error) {
+        console.error('Error fetching availability:', error);
+        setAvailability(null);
+      } finally {
+        setIsLoadingAvailability(false);
+      }
+    };
+
+    fetchAvailability();
+  }, [selectedSpot, date]);
+
   const handleBook = () => {
     if (!user) {
       setAuthModalOpen(true);
     } else {
-      // We pass whatever state we have (even if empty) to the next page.
-      // The Payment/Booking page will handle the "Select Date" logic.
       setSearchCriteria({
         date: date?.toISOString().split('T')[0] || '',
         startTime: startTime,
@@ -98,7 +143,6 @@ export default function SearchOverlay() {
     }
   };
 
-  // Logic for search button remains the same (needs input to search)
   const isSearchButtonEnabled = isSearchActive || (date !== undefined && startTime !== '' && endTime !== '');
 
   return (
@@ -198,17 +242,32 @@ export default function SearchOverlay() {
                     </div>
 
                     <div>
-                      <Title2>Full Availability</Title2>
+                      <Title2>
+                        {date ? `Available on ${availability?.day || '...'}` : 'Availability'}
+                      </Title2>
                       <div className="text-base font-normal text-gray-600 mt-1 space-y-1">
-                        {displaySpot.availabilityIntervals && displaySpot.availabilityIntervals.length > 0
-                          ? displaySpot.availabilityIntervals.map((interval: any, idx: number) => (
-                              <div key={idx} className="flex flex-col sm:flex-row sm:gap-2">
-                                {interval.day && <span className="font-medium text-gray-900">{interval.day},</span>}
-                                <span>{formatTime(interval.start)} - {formatTime(interval.end)}</span>
+                        {isLoadingAvailability ? (
+                          <div className="text-gray-400">Loading availability...</div>
+                        ) : date && availability ? (
+                          availability.available_slots.length > 0 ? (
+                            availability.available_slots.map((slot, idx) => (
+                              <div key={idx} className="flex gap-2">
+                                <span>{slot.start_time} - {slot.end_time}</span>
                               </div>
                             ))
-                          : <div>Check calendar</div>
-                        }
+                          ) : (
+                            <div className="text-red-600 font-medium">Fully Booked</div>
+                          )
+                        ) : displaySpot.availabilityIntervals && displaySpot.availabilityIntervals.length > 0 ? (
+                          displaySpot.availabilityIntervals.map((interval: any, idx: number) => (
+                            <div key={idx} className="flex flex-col sm:flex-row sm:gap-2">
+                              {interval.day && <span className="font-medium text-gray-900">{interval.day},</span>}
+                              <span>{formatTime(interval.start)} - {formatTime(interval.end)}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <div>Check calendar</div>
+                        )}
                       </div>
                     </div>
 
@@ -218,9 +277,15 @@ export default function SearchOverlay() {
                     </div>
                   </div>
                 </Tile>
-                {/* Button now simply says "Book with Host" and navigates */}
-                <Button1 onClick={handleBook} className="w-full mt-[24px]">
-                  Book with Host
+                <Button1
+                  onClick={handleBook}
+                  className="w-full mt-6"
+                  disabled={!!(date && availability && availability.available_slots.length === 0)}
+                >
+                  {date && availability && availability.available_slots.length === 0
+                    ? 'Fully Booked'
+                    : 'Book with Host'
+                  }
                 </Button1>
               </>
             )}

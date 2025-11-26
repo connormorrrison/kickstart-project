@@ -611,6 +611,173 @@ def get_parking_spot(spot_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to get parking spot: {str(e)}")
 
 # ===================================================================
+# AVAILABILITY CALCULATION HELPERS & ENDPOINT
+# ===================================================================
+
+def parse_time_to_minutes(time_str: str) -> int:
+    """
+    Robust parser that handles '9:00am', '5:00 PM', and '17:00'.
+    Raises ValueError if format is invalid.
+    """
+    if not time_str:
+        raise ValueError("Time string cannot be empty")
+
+    # Normalize string: remove spaces, lowercase
+    clean_str = time_str.lower().replace(" ", "")
+
+    try:
+        # Try 12-hour format with am/pm (e.g., "9:00am")
+        if "am" in clean_str or "pm" in clean_str:
+            time_obj = datetime.strptime(clean_str, "%I:%M%p")
+        # Try 24-hour format (e.g., "17:00")
+        else:
+            time_obj = datetime.strptime(clean_str, "%H:%M")
+
+        return time_obj.hour * 60 + time_obj.minute
+    except ValueError:
+        raise ValueError(f"Invalid time format: {time_str}")
+
+def minutes_to_time_str(minutes: int) -> str:
+    """
+    Converts minutes back to clean 12-hour format for frontend display
+    e.g., 900 -> "3:00 PM"
+    """
+    hours = minutes // 60
+    mins = minutes % 60
+
+    # Python's datetime can handle the formatting for us
+    # Create a dummy date with this time
+    dummy_time = datetime.now().replace(hour=hours, minute=mins)
+    # Return in 12h format (change to %H:%M for 24h)
+    return dummy_time.strftime("%I:%M %p").lstrip("0")
+
+class AvailableSlot(BaseModel):
+    start_time: str
+    end_time: str
+
+class AvailabilityForDateOut(BaseModel):
+    date: str
+    day: str
+    available_slots: List[AvailableSlot]
+
+@app.get("/spots/{spot_id}/availability/{date}", response_model=AvailabilityForDateOut)
+def get_available_slots_for_date(spot_id: str, date: str):
+    """
+    Get available time slots for a specific parking spot on a specific date.
+    Calculates availability dynamically by subtracting booked slots from base hours.
+    """
+    try:
+        # 1. Verify Spot Exists
+        spot_response = supabase.table("parking_spots_v2").select("id").eq("id", spot_id).execute()
+        if not spot_response.data:
+            raise HTTPException(status_code=404, detail="Parking spot not found")
+
+        # 2. Determine Day of Week (e.g., "Monday")
+        try:
+            date_obj = datetime.strptime(date, "%Y-%m-%d")
+            day_name = date_obj.strftime("%A")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+
+        # 3. Get Base Availability (The "Supply")
+        # Handles cases where a host might have split hours (e.g. 9-12 AND 2-5 on Mondays)
+        intervals_response = supabase.table("availability_intervals_v2")\
+            .select("*")\
+            .eq("spot_id", spot_id)\
+            .eq("day", day_name)\
+            .execute()
+
+        if not intervals_response.data:
+            return AvailabilityForDateOut(date=date, day=day_name, available_slots=[])
+
+        # 4. Get Existing Bookings (The "Demand")
+        bookings_response = supabase.table("bookings_v2")\
+            .select("*")\
+            .eq("spot_id", spot_id)\
+            .eq("booking_date", date)\
+            .in_("status", ["confirmed", "pending"])\
+            .execute()
+
+        bookings = bookings_response.data if bookings_response.data else []
+
+        # 5. The Subtraction Logic
+        all_available_slots = []
+
+        # We iterate over every "Base Interval" the host has set
+        for base_interval in intervals_response.data:
+            try:
+                base_start = parse_time_to_minutes(base_interval["start_time"])
+                base_end = parse_time_to_minutes(base_interval["end_time"])
+            except ValueError as e:
+                print(f"Skipping invalid base interval: {e}")
+                continue
+
+            # Sort bookings to process them sequentially
+            # We parse booking times safely inside the loop or pre-process them
+            valid_bookings = []
+            for b in bookings:
+                try:
+                    b_start = parse_time_to_minutes(b["start_time"])
+                    valid_bookings.append({**b, "_start_mins": b_start})
+                except ValueError:
+                    print(f"Skipping invalid booking time: {b['start_time']}")
+                    continue
+
+            sorted_bookings = sorted(valid_bookings, key=lambda x: x["_start_mins"])
+
+            current_cursor = base_start
+
+            for booking in sorted_bookings:
+                try:
+                    book_start = booking["_start_mins"]
+                    book_end = parse_time_to_minutes(booking["end_time"])
+                except ValueError:
+                    continue
+
+                # Skip if booking doesn't overlap current check area
+                # (e.g. Booking is 8-9, Base is 9-5) OR (Booking is 6-7, Base is 9-5)
+                if book_end <= current_cursor or book_start >= base_end:
+                    continue
+
+                # If there is a gap between cursor and booking start, that is a free slot
+                # Logic: max(current_cursor, base_start) handles bookings starting before window
+                effective_start = max(current_cursor, base_start)
+                effective_book_start = max(book_start, base_start) # Clamp booking to window start
+
+                if effective_start < effective_book_start:
+                    all_available_slots.append(AvailableSlot(
+                        start_time=minutes_to_time_str(effective_start),
+                        # FIX: Use effective_book_start to ensure we don't return a time before the window
+                        end_time=minutes_to_time_str(effective_book_start)
+                    ))
+
+                # Move cursor to end of this booking
+                current_cursor = max(current_cursor, book_end)
+
+                # Optimization: If cursor passed the window end, stop checking this interval
+                if current_cursor >= base_end:
+                    break
+
+            # If there is still time left after the last booking
+            if current_cursor < base_end:
+                all_available_slots.append(AvailableSlot(
+                    start_time=minutes_to_time_str(current_cursor),
+                    end_time=minutes_to_time_str(base_end)
+                ))
+
+        return AvailabilityForDateOut(
+            date=date,
+            day=day_name,
+            available_slots=all_available_slots
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Server Error: {str(e)}") # Good for debugging
+        raise HTTPException(status_code=500, detail=f"Internal server error processing availability: {str(e)}")
+
+# ===================================================================
 # BOOKINGS ENDPOINTS
 # ===================================================================
 
@@ -635,16 +802,58 @@ def create_booking(
         # Parse times to calculate duration and total price
         from datetime import datetime as dt
         try:
-            start_dt = dt.strptime(booking_data.start_time, "%H:%M")
-            end_dt = dt.strptime(booking_data.end_time, "%H:%M")
-            duration_hours = (end_dt - start_dt).total_seconds() / 3600
+            # Use the helper function that handles both 12-hour and 24-hour formats
+            start_minutes = parse_time_to_minutes(booking_data.start_time)
+            end_minutes = parse_time_to_minutes(booking_data.end_time)
+            duration_hours = (end_minutes - start_minutes) / 60.0
 
             if duration_hours <= 0:
                 raise HTTPException(status_code=400, detail="End time must be after start time")
 
             total_price = duration_hours * spot["price_per_hour"]
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM")
+
+            # Convert back to datetime for later comparisons
+            start_dt = dt.now().replace(hour=start_minutes // 60, minute=start_minutes % 60)
+            end_dt = dt.now().replace(hour=end_minutes // 60, minute=end_minutes % 60)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+        # Get the day of the week for the booking date
+        booking_date_obj = dt.strptime(booking_data.booking_date, "%Y-%m-%d")
+        day_name = booking_date_obj.strftime("%A")
+
+        # Check if the booking time falls within the spot's recurring availability for that day
+        intervals_response = supabase.table("availability_intervals_v2")\
+            .select("*")\
+            .eq("spot_id", booking_data.spot_id)\
+            .eq("day", day_name)\
+            .execute()
+
+        if not intervals_response.data or len(intervals_response.data) == 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"This parking spot is not available on {day_name}s"
+            )
+
+        # Check if requested time falls within any of the available intervals for this day
+        time_is_within_availability = False
+        for interval in intervals_response.data:
+            try:
+                interval_start_mins = parse_time_to_minutes(interval["start_time"])
+                interval_end_mins = parse_time_to_minutes(interval["end_time"])
+
+                # Check if booking is completely within this availability interval
+                if start_minutes >= interval_start_mins and end_minutes <= interval_end_mins:
+                    time_is_within_availability = True
+                    break
+            except ValueError:
+                continue
+
+        if not time_is_within_availability:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Requested time is outside the spot's available hours for {day_name}s"
+            )
 
         # Check for conflicting bookings
         existing_bookings = supabase.table("bookings_v2")\
@@ -656,15 +865,18 @@ def create_booking(
 
         if existing_bookings.data:
             for existing in existing_bookings.data:
-                existing_start = dt.strptime(existing["start_time"], "%H:%M")
-                existing_end = dt.strptime(existing["end_time"], "%H:%M")
+                try:
+                    existing_start_mins = parse_time_to_minutes(existing["start_time"])
+                    existing_end_mins = parse_time_to_minutes(existing["end_time"])
 
-                # Check for time overlap
-                if not (end_dt <= existing_start or start_dt >= existing_end):
-                    raise HTTPException(
-                        status_code=400,
-                        detail="This time slot is already booked"
-                    )
+                    # Check for time overlap
+                    if not (end_minutes <= existing_start_mins or start_minutes >= existing_end_mins):
+                        raise HTTPException(
+                            status_code=400,
+                            detail="This time slot is already booked"
+                        )
+                except ValueError:
+                    continue
 
         # Generate UUID for the booking
         booking_id = str(uuid.uuid4())

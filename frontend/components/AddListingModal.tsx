@@ -189,8 +189,6 @@ export default function AddListingModal({ isOpen, onClose, onListingAdded }: Add
       setCoordinates({ lat: 49.2827, lng: -123.1207 });
       setSelectedSlots(new Set());
 
-      alert('Successfully created your parking spot listing!');
-
       if (onListingAdded) {
         onListingAdded();
       }
