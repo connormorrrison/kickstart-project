@@ -3,8 +3,8 @@
 import MapComponent from '@/components/MapComponent';
 import SearchOverlay from '@/components/SearchOverlay';
 import Button1 from '@/components/Button1';
-import Button2 from '@/components/Button2';
-import { User, LayoutDashboard, LogOut } from 'lucide-react';
+import UserMenu from '@/components/UserMenu';
+import { User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store';
 
@@ -37,18 +37,9 @@ export default function Home() {
         selectedSpot={selectedSpot}
       />
       <SearchOverlay />
-      <div className="absolute top-5 right-5 z-10 flex flex-col gap-3 items-end">
+      <div className="absolute top-5 right-5 z-10">
         {user ? (
-          <>
-            <Button1 onClick={() => router.push('/dashboard')}>
-              <LayoutDashboard size={18} className="mr-2" />
-              View Dashboard
-            </Button1>
-            <Button2 onClick={signOut} className="w-auto">
-              <LogOut size={18} className="mr-2" />
-              Log Out
-            </Button2>
-          </>
+          <UserMenu onSignOut={signOut} showDashboard={true} />
         ) : (
           <Button1 onClick={() => router.push('/signin')}>
             <User size={18} className="mr-2" />
