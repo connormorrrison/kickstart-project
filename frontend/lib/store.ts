@@ -2,12 +2,12 @@
 
 import { create } from 'zustand';
 import { ParkingSpot, User } from '@/types';
-import { MOCK_SPOTS } from './mockData';
 
 interface AppState {
     user: User | null;
     setUser: (user: User | null) => void;
     spots: ParkingSpot[];
+    setSpots: (spots: ParkingSpot[]) => void;
     addSpot: (spot: ParkingSpot) => void;
     selectedSpot: ParkingSpot | null;
     setSelectedSpot: (spot: ParkingSpot | null) => void;
@@ -25,15 +25,16 @@ interface AppState {
 export const useStore = create<AppState>((set) => ({
     user: null,
     setUser: (user) => set({ user }),
-    spots: MOCK_SPOTS,
+    spots: [],
+    setSpots: (spots) => set({ spots }),
     addSpot: (spot) => set((state) => ({ spots: [...state.spots, spot] })),
     selectedSpot: null,
     setSelectedSpot: (selectedSpot) => set({ selectedSpot }),
     searchCriteria: {
         location: '',
-        date: new Date().toISOString().split('T')[0],
-        startTime: '09:00',
-        endTime: '17:00',
+        date: '',
+        startTime: '',
+        endTime: '',
     },
     setSearchCriteria: (criteria) =>
         set((state) => ({

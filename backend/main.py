@@ -132,6 +132,7 @@
 # NEW V2 API - CLEAN START
 # ===================================================================
 from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
 from typing import List, Optional
@@ -140,6 +141,15 @@ from db import supabase
 import uuid
 
 app = FastAPI(title="Parking Spot API v2", version="2.0")
+
+# CORS Configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
 # Security
 security = HTTPBearer()
@@ -384,6 +394,31 @@ def get_me(current_user: dict = Depends(get_current_user)):
         created_at=current_user["created_at"],
         is_active=current_user["is_active"]
     )
+
+class PublicUserOut(BaseModel):
+    id: int
+    first_name: str
+    last_name: str
+
+@app.get("/users/{user_id}", response_model=PublicUserOut)
+def get_user_public_info(user_id: int):
+    """Get public user information (name only)"""
+    try:
+        response = supabase.table("users_v2").select("id, first_name, last_name").eq("id", user_id).execute()
+
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        user = response.data[0]
+        return PublicUserOut(
+            id=user["id"],
+            first_name=user["first_name"],
+            last_name=user["last_name"]
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get user: {str(e)}")
 
 # ===================================================================
 # PARKING SPOTS ENDPOINTS

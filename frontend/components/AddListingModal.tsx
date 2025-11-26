@@ -141,13 +141,13 @@ export default function AddListingModal({ isOpen, onClose, onListingAdded }: Add
     return grouped;
   }, [selectedSlots]);
 
-  const backendFormattedData = useMemo(() => {
-    return groupedTimeRanges.map(range => {
-      const date = getNextDateForDay(range.day);
-      const startHour = parseTimeToHour(range.startHour);
-      const endHour = parseTimeToHour(range.endHour);
-      return { date, start: startHour, end: endHour };
-    });
+  // Convert to API format for availability intervals
+  const availabilityIntervals = useMemo(() => {
+    return groupedTimeRanges.map(range => ({
+      day: range.day,
+      start_time: range.startHour.replace(' ', '').toLowerCase(), // "10:00 AM" -> "10:00am"
+      end_time: range.endHour.replace(' ', '').toLowerCase(),
+    }));
   }, [groupedTimeRanges]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -158,35 +158,29 @@ export default function AddListingModal({ isOpen, onClose, onListingAdded }: Add
       return;
     }
 
+    if (selectedSlots.size === 0) {
+      setSubmitError('Please select at least one availability time slot');
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitError(null);
 
     try {
-      const promises = backendFormattedData.map(async (timeRange) => {
-        const response = await fetch('http://localhost:8000/postings/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            username: user.username,
-            password_hash: user.password_hash,
-            address: fullAddress,
-            lat: coordinates.lat,
-            lng: coordinates.lng,
-            price: numericRate,
-            date: timeRange.date,
-            start: timeRange.start,
-            end: timeRange.end,
-          }),
-        });
+      const { spotsApi } = await import('@/lib/api');
 
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.detail || 'Failed to create posting');
-        }
-        return response.json();
+      // Create the parking spot
+      const newSpot = await spotsApi.create({
+        street,
+        city,
+        province,
+        postal_code: postalCode,
+        country,
+        lat: coordinates.lat,
+        lng: coordinates.lng,
+        price_per_hour: numericRate,
+        availability_intervals: availabilityIntervals,
       });
-
-      await Promise.all(promises);
 
       // Reset form
       setStreet('');
@@ -194,8 +188,8 @@ export default function AddListingModal({ isOpen, onClose, onListingAdded }: Add
       setRate('10');
       setCoordinates({ lat: 49.2827, lng: -123.1207 });
       setSelectedSlots(new Set());
-      
-      alert(`Successfully created ${backendFormattedData.length} listing(s)!`);
+
+      alert('Successfully created your parking spot listing!');
 
       if (onListingAdded) {
         onListingAdded();

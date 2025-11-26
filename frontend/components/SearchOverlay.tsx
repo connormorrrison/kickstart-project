@@ -14,17 +14,36 @@ import Title2 from '@/components/Title2';
 import { PopInOutEffect } from '@/components/PopInOutEffect';
 import { Popover, PopoverTrigger } from '@/components/ui/popover';
 import PopoverContent1 from '@/components/PopoverContent1';
-import { formatAddress } from '@/lib/addressUtils';
+
+// Helper to format the full address string
+const formatAddress = (spot: any) => {
+  if (!spot) return '';
+  if (spot.street && spot.city) {
+    return `${spot.street}, ${spot.city}, ${spot.province}`;
+  }
+  return spot.address || '';
+};
+
+// Helper function to format time
+const formatTime = (time: string) => {
+  if (!time) return '';
+  const match = time.match(/(\d{1,2}):(\d{2})\s*(am|pm|AM|PM)?/i);
+  if (!match) return time;
+  const [, hours, minutes, period] = match;
+  const formattedPeriod = period ? period.toUpperCase() : '';
+  return `${hours}:${minutes} ${formattedPeriod}`.trim();
+};
 
 export default function SearchOverlay() {
   const router = useRouter();
   const [date, setDate] = React.useState<Date | undefined>(undefined);
-  const [startTime, setStartTime] = React.useState('10:00');
-  const [endTime, setEndTime] = React.useState('11:00');
+  
+  // Default values could be set here if you wanted, e.g. '09:00', '17:00'
+  const [startTime, setStartTime] = React.useState('');
+  const [endTime, setEndTime] = React.useState('');
+  
   const [isDatePickerOpen, setIsDatePickerOpen] = React.useState(false);
   const [isVisible, setIsVisible] = React.useState(false);
-
-  // New state to track if we have performed a search
   const [isSearchActive, setIsSearchActive] = React.useState(false);
 
   const { selectedSpot, setSelectedSpot, user, setAuthModalOpen, setSearchCriteria } = useStore();
@@ -33,7 +52,6 @@ export default function SearchOverlay() {
     setIsVisible(true);
   }, []);
 
-  // --- MECHANICS: Data Persistence ---
   const [displaySpot, setDisplaySpot] = React.useState(selectedSpot);
 
   React.useEffect(() => {
@@ -45,13 +63,15 @@ export default function SearchOverlay() {
     }
   }, [selectedSpot]);
 
+  // Update handleBook to proceed regardless of search inputs
   const handleBook = () => {
     if (!user) {
       setAuthModalOpen(true);
     } else {
-      // Save booking details to store before navigating
+      // We pass whatever state we have (even if empty) to the next page.
+      // The Payment/Booking page will handle the "Select Date" logic.
       setSearchCriteria({
-        date: date?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+        date: date?.toISOString().split('T')[0] || '',
         startTime: startTime,
         endTime: endTime,
       });
@@ -61,22 +81,25 @@ export default function SearchOverlay() {
 
   const handleSearchToggle = () => {
     if (isSearchActive) {
-      // RESET LOGIC
+      // RESET
       setIsSearchActive(false);
       setDate(undefined);
-      setStartTime('10:00'); // Reset to defaults
-      setEndTime('11:00');
-      // Here you would trigger the map to show all pins again
+      setStartTime('');
+      setEndTime('');
+      setSearchCriteria({ date: '', startTime: '', endTime: '' });
     } else {
-      // SEARCH LOGIC
+      // SEARCH
       setIsSearchActive(true);
-      // Here you would trigger the map filtering based on date/time
+      setSearchCriteria({
+        date: date?.toISOString().split('T')[0] || '',
+        startTime: startTime,
+        endTime: endTime,
+      });
     }
   };
 
-  // Button is enabled if we are already searching (to allow reset) 
-  // OR if all fields are filled (to allow search)
-  const isButtonEnabled = isSearchActive || (date !== undefined && startTime !== '' && endTime !== '');
+  // Logic for search button remains the same (needs input to search)
+  const isSearchButtonEnabled = isSearchActive || (date !== undefined && startTime !== '' && endTime !== '');
 
   return (
     <PopInOutEffect isVisible={isVisible} className="absolute left-5 top-5 z-10 max-h-[calc(100vh-40px)]">
@@ -90,12 +113,7 @@ export default function SearchOverlay() {
             <Title2>Date</Title2>
             <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
               <PopoverTrigger asChild>
-                <DatePickerButton 
-                  className={cn(!date && "text-muted-foreground")}
-                  // Optional: Disable input changes while search is active to force reset first?
-                  // removed disabled prop to allow changing search criteria if desired, 
-                  // but per prompt requirements, we just reset on click.
-                >
+                <DatePickerButton className={cn(!date && "text-muted-foreground")}>
                   {date ? date.toLocaleDateString() : "Select date"}
                   <ChevronDownIcon className="opacity-50" />
                 </DatePickerButton>
@@ -118,21 +136,31 @@ export default function SearchOverlay() {
           <div className="flex gap-[24px]">
             <div className="flex-1">
               <Title2>Start</Title2>
-              <TimeInput value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+              <TimeInput
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                disabled={!date}
+                placeholder={!date ? "-" : "09:00"}
+              />
             </div>
             <div className="flex-1">
               <Title2>End</Title2>
-              <TimeInput value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+              <TimeInput
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                disabled={!date}
+                placeholder={!date ? "-" : "17:00"}
+              />
             </div>
           </div>
 
           <Button1 
-            disabled={!isButtonEnabled} 
+            disabled={!isSearchButtonEnabled} 
             onClick={handleSearchToggle}
             className={`
               transition-all duration-500 ease-in-out
               ${isSearchActive 
-                ? 'bg-green-600 hover:bg-green-700 text-white border-transparent' 
+                ? 'bg-red-600 hover:bg-red-700 text-white border-transparent' 
                 : ''
               }
             `}
@@ -142,12 +170,7 @@ export default function SearchOverlay() {
         </div>
 
         {/* --- THE ANIMATION --- */}
-        <div
-          className={`
-            grid overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.1,0.9,0.3,1)]
-            ${selectedSpot ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}
-          `}
-        >
+        <div className={`grid overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.1,0.9,0.3,1)] ${selectedSpot ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
           <div className="min-h-0">
             {displaySpot && (
               <>
@@ -181,10 +204,10 @@ export default function SearchOverlay() {
                           ? displaySpot.availabilityIntervals.map((interval: any, idx: number) => (
                               <div key={idx} className="flex flex-col sm:flex-row sm:gap-2">
                                 {interval.day && <span className="font-medium text-gray-900">{interval.day},</span>}
-                                <span>{interval.start} - {interval.end}</span>
+                                <span>{formatTime(interval.start)} - {formatTime(interval.end)}</span>
                               </div>
                             ))
-                          : <div>See availability below</div>
+                          : <div>Check calendar</div>
                         }
                       </div>
                     </div>
@@ -195,7 +218,10 @@ export default function SearchOverlay() {
                     </div>
                   </div>
                 </Tile>
-                <Button1 onClick={handleBook} className="w-full mt-[24px]">Proceed to Payment</Button1>
+                {/* Button now simply says "Book with Host" and navigates */}
+                <Button1 onClick={handleBook} className="w-full mt-[24px]">
+                  Book with Host
+                </Button1>
               </>
             )}
           </div>

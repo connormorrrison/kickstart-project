@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Home, Search } from 'lucide-react';
+import { Plus, Home, Search, Calendar, Clock, MapPin } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import Tile from '@/components/Tile';
 import Button1 from '@/components/Button1';
@@ -10,32 +10,14 @@ import Button2 from '@/components/Button2';
 import UserMenu from '@/components/UserMenu';
 import AddListingModal from '@/components/AddListingModal';
 import { PopInOutEffect } from '@/components/PopInOutEffect';
-
-interface TimeSlot {
-  date: string;
-  start: number;
-  end: number;
-}
-
-interface Listing {
-  id: number;
-  address: string;
-  description?: string;
-  price: number;
-  status: string;
-  image: string | null;
-  bookings: number;
-  rating: number | null;
-  lat: number;
-  lng: number;
-  timeSlots: TimeSlot[];
-}
+import { bookingsApi, spotsApi, Booking, ParkingSpot } from '@/lib/api';
 
 export default function Dashboard() {
   const router = useRouter();
   const { user } = useStore();
   const { signOut } = require('@/hooks/useAuth').useAuth();
-  const [listings, setListings] = React.useState<Listing[]>([]);
+  const [bookings, setBookings] = React.useState<Booking[]>([]);
+  const [listings, setListings] = React.useState<ParkingSpot[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
   const [isAddListingModalOpen, setIsAddListingModalOpen] = React.useState(false);
 
@@ -46,19 +28,48 @@ export default function Dashboard() {
     }
   }, [user, router]);
 
+  // Fetch bookings and listings
+  React.useEffect(() => {
+    const fetchData = async () => {
+      if (!user) return;
+
+      setIsLoading(true);
+      try {
+        // Fetch user's bookings
+        const userBookings = await bookingsApi.list();
+        setBookings(userBookings);
+
+        // Fetch all spots and filter by host_id
+        const allSpots = await spotsApi.list();
+        const userListings = allSpots.filter(spot => spot.host_id === user.id);
+        setListings(userListings);
+      } catch (error) {
+        console.error('Failed to fetch dashboard data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user]);
+
   if (!user) {
     return null;
   }
 
   // Calculate stats
-  const activeListingsCount = listings.filter(l => l.status === 'active').length;
-  const totalBookings = listings.reduce((sum, listing) => sum + listing.bookings, 0);
-  const totalTimeSlots = listings.reduce((sum, listing) => sum + listing.timeSlots.length, 0);
+  const activeListingsCount = listings.filter(l => l.is_active).length;
+  const totalBookings = bookings.length;
 
-  const handleListingAdded = () => {
-    // In a real app, you would fetch the updated listings here
-    console.log("Listing added! Refreshing data...");
-    // For now, we just close the modal
+  const handleListingAdded = async () => {
+    // Refresh listings
+    try {
+      const allSpots = await spotsApi.list();
+      const userListings = allSpots.filter(spot => spot.host_id === user.id);
+      setListings(userListings);
+    } catch (error) {
+      console.error('Failed to refresh listings:', error);
+    }
     setIsAddListingModalOpen(false);
   };
 
@@ -113,13 +124,56 @@ export default function Dashboard() {
               Find Parking
             </Button1>
           </div>
-          
+
           <div className="grid gap-4">
-            <PopInOutEffect isVisible={true}>
-              <Tile className="p-8 flex justify-center items-center">
-                <p className="text-base text-gray-500">You have no active bookings</p>
-              </Tile>
-            </PopInOutEffect>
+            {bookings.length === 0 ? (
+              <PopInOutEffect isVisible={true}>
+                <Tile className="p-8 flex justify-center items-center">
+                  <p className="text-base text-gray-500">You have no active bookings</p>
+                </Tile>
+              </PopInOutEffect>
+            ) : (
+              bookings.map((booking) => (
+                <PopInOutEffect key={booking.id} isVisible={true}>
+                  <Tile className="p-6">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-3">
+                          <Calendar size={18} className="text-gray-500" />
+                          <span className="font-normal text-gray-900">
+                            {new Date(booking.booking_date).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 mb-3">
+                          <Clock size={18} className="text-gray-500" />
+                          <span className="font-normal text-gray-900">
+                            {booking.start_time} - {booking.end_time}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <MapPin size={18} className="text-gray-500" />
+                          <span className="font-normal text-gray-500 text-sm">
+                            Spot ID: {booking.spot_id.substring(0, 8)}...
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        <span className={`px-3 py-1 rounded text-sm font-normal ${
+                          booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+                          booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {booking.status}
+                        </span>
+                        <span className="text-lg font-normal text-gray-900">
+                          ${booking.total_price.toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  </Tile>
+                </PopInOutEffect>
+              ))
+            )}
           </div>
         </div>
 
@@ -132,7 +186,7 @@ export default function Dashboard() {
               Add Listing
             </Button1>
           </div>
-          
+
           <div className="grid gap-4">
             {listings.length === 0 ? (
               <PopInOutEffect isVisible={true}>
@@ -141,24 +195,31 @@ export default function Dashboard() {
                 </Tile>
               </PopInOutEffect>
             ) : (
-              // Listings sorted by recently added (descending ID)
-              listings
-                .sort((a, b) => b.id - a.id)
-                .map((listing) => (
-                  <PopInOutEffect key={listing.id} isVisible={true}>
-                    <Tile className="p-4">
-                       <div className="flex justify-between items-center">
-                          <div>
-                            <p className="font-medium text-gray-900">{listing.address}</p>
-                            <p className="text-sm text-gray-500 mt-1">${listing.price}/hr</p>
-                          </div>
-                          <span className={`px-2 py-1 rounded text-sm ${listing.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                            {listing.status}
-                          </span>
-                       </div>
-                    </Tile>
-                  </PopInOutEffect>
-                ))
+              listings.map((listing) => (
+                <PopInOutEffect key={listing.id} isVisible={true}>
+                  <Tile className="p-6">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h3 className="font-normal text-lg text-gray-900 mb-2">
+                          {listing.street}
+                        </h3>
+                        <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
+                          <MapPin size={16} />
+                          <span>{listing.city}, {listing.province}</span>
+                        </div>
+                        <p className="text-base text-gray-900">
+                          ${listing.price_per_hour.toFixed(2)}/hr
+                        </p>
+                      </div>
+                      <span className={`px-3 py-1 rounded text-sm font-normal ${
+                        listing.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {listing.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                  </Tile>
+                </PopInOutEffect>
+              ))
             )}
           </div>
         </div>

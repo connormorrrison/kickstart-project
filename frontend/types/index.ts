@@ -4,13 +4,19 @@ export interface ParkingSpot {
     city: string;
     province: string;
     postalCode: string;
+    postal_code?: string; // API returns this
     country: string;
     lat: number;
     lng: number;
     pricePerHour: number;
+    price_per_hour?: number; // API returns this
     hostId: number;
+    host_id?: number; // API returns this
     hostName?: string;
-    availabilityIntervals?: Array<{ day: string; start: string; end: string }>;
+    is_active?: boolean;
+    created_at?: string;
+    availabilityIntervals?: Array<{ day: string; start: string; end: string; start_time?: string; end_time?: string }>;
+    availability_intervals?: Array<{ day: string; start_time: string; end_time: string }>; // API returns this
 }
 
 export interface User {
