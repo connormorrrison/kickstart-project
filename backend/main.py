@@ -226,6 +226,63 @@ class BookingOut(BaseModel):
     created_at: str
 
 # ===================================================================
+# AUTHENTICATION & PASSWORD UTILITIES
+# ===================================================================
+import bcrypt
+import jwt
+from datetime import timedelta
+
+# JWT Configuration
+SECRET_KEY = "your-secret-key-change-this-in-production"  # TODO: Move to env variable
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
+
+def hash_password(password: str) -> str:
+    """Hash a password using bcrypt"""
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+    return hashed.decode('utf-8')
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a password against its hash"""
+    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+
+def create_access_token(data: dict) -> str:
+    """Create a JWT access token"""
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def decode_token(token: str) -> dict:
+    """Decode and verify a JWT token"""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token has expired")
+    except jwt.JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+    """Get current user from JWT token"""
+    token = credentials.credentials
+    payload = decode_token(token)
+    user_id = payload.get("user_id")
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    # Get user from database
+    try:
+        response = supabase.table("users_v2").select("*").eq("id", user_id).execute()
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(status_code=404, detail="User not found")
+        return response.data[0]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+# ===================================================================
 # HEALTH CHECK ENDPOINT
 # ===================================================================
 @app.get("/health")
@@ -237,4 +294,94 @@ def health_check():
         return {"status": "healthy", "database": "connected"}
     except Exception as e:
         return {"status": "unhealthy", "database": "disconnected", "error": str(e)}
+
+# ===================================================================
+# AUTHENTICATION ENDPOINTS
+# ===================================================================
+
+@app.post("/auth/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+def register(user_data: UserCreate):
+    """Register a new user"""
+    try:
+        # Check if user already exists
+        existing = supabase.table("users_v2").select("id").eq("email", user_data.email).execute()
+        if existing.data and len(existing.data) > 0:
+            raise HTTPException(status_code=400, detail="Email already registered")
+
+        # Hash password
+        hashed_password = hash_password(user_data.password)
+
+        # Create user
+        new_user = {
+            "first_name": user_data.first_name,
+            "last_name": user_data.last_name,
+            "email": user_data.email,
+            "password_hash": hashed_password,
+            "created_at": datetime.utcnow().isoformat(),
+            "is_active": True
+        }
+
+        response = supabase.table("users_v2").insert(new_user).execute()
+
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(status_code=500, detail="Failed to create user")
+
+        created_user = response.data[0]
+        return UserOut(
+            id=created_user["id"],
+            first_name=created_user["first_name"],
+            last_name=created_user["last_name"],
+            email=created_user["email"],
+            created_at=created_user["created_at"],
+            is_active=created_user["is_active"]
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+
+@app.post("/auth/login", response_model=TokenResponse)
+def login(credentials: UserLogin):
+    """Login and get access token"""
+    try:
+        # Get user by email
+        response = supabase.table("users_v2").select("*").eq("email", credentials.email).execute()
+
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+
+        user = response.data[0]
+
+        # Verify password
+        if not verify_password(credentials.password, user["password_hash"]):
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+
+        # Check if user is active
+        if not user["is_active"]:
+            raise HTTPException(status_code=403, detail="Account is deactivated")
+
+        # Create access token
+        access_token = create_access_token({"user_id": user["id"]})
+
+        return TokenResponse(access_token=access_token, token_type="bearer")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
+
+@app.get("/auth/me", response_model=UserOut)
+def get_me(current_user: dict = Depends(get_current_user)):
+    """Get current authenticated user"""
+    return UserOut(
+        id=current_user["id"],
+        first_name=current_user["first_name"],
+        last_name=current_user["last_name"],
+        email=current_user["email"],
+        created_at=current_user["created_at"],
+        is_active=current_user["is_active"]
+    )
 
