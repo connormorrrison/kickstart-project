@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import { ChevronDownIcon, User, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useStore } from '@/lib/store';
@@ -16,16 +17,17 @@ import PopoverContent1 from '@/components/PopoverContent1';
 import { formatAddress } from '@/lib/addressUtils';
 
 export default function SearchOverlay() {
+  const router = useRouter();
   const [date, setDate] = React.useState<Date | undefined>(undefined);
   const [startTime, setStartTime] = React.useState('10:00');
   const [endTime, setEndTime] = React.useState('11:00');
   const [isDatePickerOpen, setIsDatePickerOpen] = React.useState(false);
   const [isVisible, setIsVisible] = React.useState(false);
-  
+
   // New state to track if we have performed a search
   const [isSearchActive, setIsSearchActive] = React.useState(false);
 
-  const { selectedSpot, setSelectedSpot, user, setAuthModalOpen } = useStore();
+  const { selectedSpot, setSelectedSpot, user, setAuthModalOpen, setSearchCriteria } = useStore();
 
   React.useEffect(() => {
     setIsVisible(true);
@@ -44,8 +46,17 @@ export default function SearchOverlay() {
   }, [selectedSpot]);
 
   const handleBook = () => {
-    if (!user) setAuthModalOpen(true);
-    else alert('Proceeding to payment...');
+    if (!user) {
+      setAuthModalOpen(true);
+    } else {
+      // Save booking details to store before navigating
+      setSearchCriteria({
+        date: date?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0],
+        startTime: startTime,
+        endTime: endTime,
+      });
+      router.push('/payment');
+    }
   };
 
   const handleSearchToggle = () => {

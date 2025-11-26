@@ -63,21 +63,21 @@ export default function Dashboard() {
 
   return (
     <main className="min-h-screen w-full bg-gray-50 relative">
-      {/* Top Left - Home Button */}
-      <div className="absolute top-5 left-5 z-10">
+      {/* Top Left - Home Button (Fixed) */}
+      <div className="fixed top-5 left-5 z-20">
         <Button2 onClick={() => router.push('/')}>
           <MoveLeft size={18} className="mr-2" />
           Home
         </Button2>
       </div>
 
-      {/* Top Right - User Menu */}
-      <div className="absolute top-5 right-5 z-10 flex flex-col gap-3 items-end">
+      {/* Top Right - User Menu (Fixed) */}
+      <div className="fixed top-5 right-5 z-20 flex flex-col gap-3 items-end">
         <UserMenu onSignOut={signOut} showDashboard={false} />
       </div>
 
       {/* Welcome Section */}
-      <div className="pt-24 px-8">
+      <div className="pt-24 px-8 pb-12">
         <div>
           <h1 className="text-3xl font-normal text-gray-900">
             Welcome back, {user.first_name}
