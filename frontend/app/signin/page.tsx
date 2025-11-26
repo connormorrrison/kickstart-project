@@ -18,27 +18,37 @@ export default function SignIn() {
   const [password, setPassword] = React.useState('');
   const [isVisible, setIsVisible] = React.useState(false);
   const { spots } = useStore();
+  const { signIn, isLoading, error } = require('@/hooks/useAuth').useAuth();
 
   React.useEffect(() => {
     setIsVisible(true);
   }, []);
 
-  const handleSignIn = (e: React.FormEvent) => {
+  // Memoize the map component so it doesn't re-render on every keystroke
+  const mapBackground = React.useMemo(() => (
+    <div className="absolute inset-0 pointer-events-none">
+      <MapComponent
+        spots={spots}
+        onSpotSelect={() => {}}
+        selectedSpot={null}
+      />
+    </div>
+  ), [spots]);
+
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement actual sign in logic
-    console.log('Sign in with:', { email, password });
+    try {
+      await signIn({ email, password });
+    } catch (err) {
+      // Error is handled by useAuth hook
+      console.error('Sign in error:', err);
+    }
   };
 
   return (
     <main className="min-h-screen w-full relative">
       {/* Background Map - Non-interactive */}
-      <div className="absolute inset-0 pointer-events-none">
-        <MapComponent
-          spots={spots}
-          onSpotSelect={() => {}}
-          selectedSpot={null}
-        />
-      </div>
+      {mapBackground}
 
       {/* Blur Overlay */}
       <div className="absolute inset-0 backdrop-blur-lg bg-white/10 pointer-events-none" />
@@ -79,7 +89,15 @@ export default function SignIn() {
                 />
               </div>
 
-              <Button1 type="submit" className="w-full">Sign In</Button1>
+              {error && (
+                <div className="text-sm text-red-600 text-center">
+                  {error}
+                </div>
+              )}
+
+              <Button1 type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? 'Signing in...' : 'Sign In'}
+              </Button1>
             </form>
 
             <div className="text-center text-base text-gray-600">

@@ -17,10 +17,12 @@ export interface ParkingSpot {
 }
 
 export interface User {
-    id: string;
-    name: string;
+    id: number;
+    first_name: string;
+    last_name: string;
     email: string;
-    isHost: boolean;
+    created_at: string;
+    is_active: boolean;
 }
 
 export interface Booking {

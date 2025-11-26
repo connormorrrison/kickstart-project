@@ -20,28 +20,57 @@ export default function SignUp() {
   const [password, setPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
   const [isVisible, setIsVisible] = React.useState(false);
+  const [validationError, setValidationError] = React.useState('');
   const { spots } = useStore();
+  const { signUp, isLoading, error } = require('@/hooks/useAuth').useAuth();
 
   React.useEffect(() => {
     setIsVisible(true);
   }, []);
 
-  const handleSignUp = (e: React.FormEvent) => {
+  // Memoize the map component so it doesn't re-render on every keystroke
+  const mapBackground = React.useMemo(() => (
+    <div className="absolute inset-0 pointer-events-none">
+      <MapComponent
+        spots={spots}
+        onSpotSelect={() => {}}
+        selectedSpot={null}
+      />
+    </div>
+  ), [spots]);
+
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement actual sign up logic
-    console.log('Sign up with:', { firstName, lastName, email, password, confirmPassword });
+    setValidationError('');
+
+    // Validation
+    if (password !== confirmPassword) {
+      setValidationError('Passwords do not match');
+      return;
+    }
+
+    if (password.length < 8) {
+      setValidationError('Password must be at least 8 characters long');
+      return;
+    }
+
+    try {
+      await signUp({
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        password,
+      });
+    } catch (err) {
+      // Error is handled by useAuth hook
+      console.error('Sign up error:', err);
+    }
   };
 
   return (
     <main className="min-h-screen w-full relative">
       {/* Background Map - Non-interactive */}
-      <div className="absolute inset-0 pointer-events-none">
-        <MapComponent
-          spots={spots}
-          onSpotSelect={() => {}}
-          selectedSpot={null}
-        />
-      </div>
+      {mapBackground}
 
       {/* Blur Overlay */}
       <div className="absolute inset-0 backdrop-blur-lg bg-white/10 pointer-events-none" />
@@ -114,7 +143,15 @@ export default function SignUp() {
                 />
               </div>
 
-              <Button1 type="submit" className="w-full">Sign Up</Button1>
+              {(validationError || error) && (
+                <div className="text-sm text-red-600 text-center">
+                  {validationError || error}
+                </div>
+              )}
+
+              <Button1 type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? 'Creating account...' : 'Sign Up'}
+              </Button1>
             </form>
 
             <div className="text-center text-base text-gray-600">
