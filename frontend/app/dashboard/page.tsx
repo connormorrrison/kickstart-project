@@ -2,13 +2,14 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, MoveLeft, Search } from 'lucide-react';
+import { Plus, Home, Search } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import Tile from '@/components/Tile';
 import Button1 from '@/components/Button1';
 import Button2 from '@/components/Button2';
 import UserMenu from '@/components/UserMenu';
 import AddListingModal from '@/components/AddListingModal';
+import { PopInOutEffect } from '@/components/PopInOutEffect';
 
 interface TimeSlot {
   date: string;
@@ -66,7 +67,7 @@ export default function Dashboard() {
       {/* Top Left - Home Button (Fixed) */}
       <div className="fixed top-5 left-5 z-20">
         <Button2 onClick={() => router.push('/')}>
-          <MoveLeft size={18} className="mr-2" />
+          <Home size={18} className="mr-2" />
           Home
         </Button2>
       </div>
@@ -89,14 +90,18 @@ export default function Dashboard() {
 
         {/* Stats Tiles */}
         <div className="mt-8 grid grid-cols-2 gap-6">
-          <Tile className="p-6">
-            <h2 className="text-base font-normal text-gray-500">Total Bookings</h2>
-            <p className="mt-2 text-3xl font-normal text-gray-900">{totalBookings}</p>
-          </Tile>
-          <Tile className="p-6">
-            <h2 className="text-base font-normal text-gray-500">Active Listings</h2>
-            <p className="mt-2 text-3xl font-normal text-gray-900">{activeListingsCount}</p>
-          </Tile>
+          <PopInOutEffect isVisible={true}>
+            <Tile className="p-6">
+              <h2 className="text-base font-normal text-gray-500">Total Bookings</h2>
+              <p className="mt-2 text-3xl font-normal text-gray-900">{totalBookings}</p>
+            </Tile>
+          </PopInOutEffect>
+          <PopInOutEffect isVisible={true}>
+            <Tile className="p-6">
+              <h2 className="text-base font-normal text-gray-500">Active Listings</h2>
+              <p className="mt-2 text-3xl font-normal text-gray-900">{activeListingsCount}</p>
+            </Tile>
+          </PopInOutEffect>
         </div>
 
         {/* Your Bookings Section */}
@@ -110,10 +115,11 @@ export default function Dashboard() {
           </div>
           
           <div className="grid gap-4">
-            {/* Using Tile for empty state */}
-            <Tile className="p-8 flex justify-center items-center">
-              <p className="text-base text-gray-500">You have no active bookings</p>
-            </Tile>
+            <PopInOutEffect isVisible={true}>
+              <Tile className="p-8 flex justify-center items-center">
+                <p className="text-base text-gray-500">You have no active bookings</p>
+              </Tile>
+            </PopInOutEffect>
           </div>
         </div>
 
@@ -129,26 +135,29 @@ export default function Dashboard() {
           
           <div className="grid gap-4">
             {listings.length === 0 ? (
-              // Using Tile for empty state
-              <Tile className="p-8 flex justify-center items-center">
-                <p className="text-base text-gray-500">You haven't listed any spots yet</p>
-              </Tile>
+              <PopInOutEffect isVisible={true}>
+                <Tile className="p-8 flex justify-center items-center">
+                  <p className="text-base text-gray-500">You haven't listed any spots yet</p>
+                </Tile>
+              </PopInOutEffect>
             ) : (
               // Listings sorted by recently added (descending ID)
               listings
                 .sort((a, b) => b.id - a.id)
                 .map((listing) => (
-                  <Tile key={listing.id} className="p-4">
-                     <div className="flex justify-between items-center">
-                        <div>
-                          <p className="font-medium text-gray-900">{listing.address}</p>
-                          <p className="text-sm text-gray-500 mt-1">${listing.price}/hr</p>
-                        </div>
-                        <span className={`px-2 py-1 rounded text-sm ${listing.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                          {listing.status}
-                        </span>
-                     </div>
-                  </Tile>
+                  <PopInOutEffect key={listing.id} isVisible={true}>
+                    <Tile className="p-4">
+                       <div className="flex justify-between items-center">
+                          <div>
+                            <p className="font-medium text-gray-900">{listing.address}</p>
+                            <p className="text-sm text-gray-500 mt-1">${listing.price}/hr</p>
+                          </div>
+                          <span className={`px-2 py-1 rounded text-sm ${listing.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
+                            {listing.status}
+                          </span>
+                       </div>
+                    </Tile>
+                  </PopInOutEffect>
                 ))
             )}
           </div>

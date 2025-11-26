@@ -2,13 +2,14 @@
 
 import { useStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
-import { CreditCard, Calendar, Clock, MapPin, ShieldCheck, MoveLeft } from 'lucide-react';
+import { CreditCard, Calendar, Clock, MapPin, ShieldCheck, Home } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import Tile from '@/components/Tile';
 import Button1 from '@/components/Button1';
 import Button2 from '@/components/Button2';
 import CustomInput from '@/components/CustomInput';
 import UserMenu from '@/components/UserMenu';
+import { PopInOutEffect } from '@/components/PopInOutEffect';
 
 export default function PaymentPage() {
     const { selectedSpot, user } = useStore();
@@ -38,12 +39,20 @@ export default function PaymentPage() {
     const serviceFee = 2.00;
     const total = selectedSpot.pricePerHour + serviceFee;
 
+    // Format time to AM/PM
+    const formatTimeToAMPM = (time: string) => {
+        const [hours, minutes] = time.split(':').map(Number);
+        const period = hours >= 12 ? 'PM' : 'AM';
+        const displayHours = hours % 12 || 12;
+        return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+    };
+
     return (
         <main className="min-h-screen w-full bg-gray-50 relative">
             {/* Top Left - Home Button (Fixed) */}
             <div className="fixed top-5 left-5 z-20">
                 <Button2 onClick={() => router.push('/')}>
-                    <MoveLeft size={18} className="mr-2" />
+                    <Home size={18} className="mr-2" />
                     Home
                 </Button2>
             </div>
@@ -60,12 +69,9 @@ export default function PaymentPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-8">
                     {/* Left Column: Payment Details */}
                     <div>
-                        <Tile className="p-8">
-                            {/* Reduced mb-6 to mb-4 */}
-                            <div className="flex items-center gap-3 mb-4">
-                                <CreditCard size={24} className="text-gray-900" />
-                                <h2 className="text-base font-normal text-gray-900">Payment Method</h2>
-                            </div>
+                        <PopInOutEffect isVisible={true}>
+                            <Tile className="p-6">
+                                <h2 className="text-xl font-normal text-gray-900 mb-4">Payment Method</h2>
 
                             {/* Reduced gap-6 to gap-5 */}
                             <form onSubmit={handlePayment} className="flex flex-col gap-5">
@@ -119,20 +125,23 @@ export default function PaymentPage() {
                                 </Button1>
                             </form>
                         </Tile>
+                        </PopInOutEffect>
                     </div>
 
                     {/* Right Column: Booking Summary */}
                     <div>
-                        <Tile className="p-6 sticky top-24">
+                        <PopInOutEffect isVisible={true}>
+                            <Tile className="p-6 sticky top-24">
                             {/* Reduced mb-6 to mb-4 */}
                             <h2 className="text-xl font-normal mb-4 text-gray-900">Booking Summary</h2>
 
-                            {/* Reduced mb-6 to mb-4 */}
                             <div className="mb-4">
                                 <div className="text-lg font-normal text-gray-900 mb-1">{selectedSpot.street}</div>
-                                <div className="flex items-center gap-1.5 text-base text-gray-500 font-normal">
-                                    <MapPin size={16} /> 
+                                <div className="text-base text-gray-500 font-normal">
                                     {selectedSpot.city}, {selectedSpot.province}
+                                </div>
+                                <div className="text-base text-gray-500 font-normal">
+                                    {selectedSpot.postalCode}, {selectedSpot.country}
                                 </div>
                             </div>
 
@@ -148,7 +157,7 @@ export default function PaymentPage() {
                                     <div className="flex items-center gap-2 text-gray-600 text-base font-normal">
                                         <Clock size={18} /> Time
                                     </div>
-                                    <div className="font-normal text-base text-gray-900">10:00 - 11:00</div>
+                                    <div className="font-normal text-base text-gray-900">{formatTimeToAMPM('10:00')} - {formatTimeToAMPM('11:00')}</div>
                                 </div>
                             </div>
 
@@ -164,8 +173,7 @@ export default function PaymentPage() {
                                 </div>
                             </div>
 
-                            {/* Reduced pt-6 to pt-4 and mb-6 to mb-4 */}
-                            <div className="pt-4 flex justify-between items-center mb-4">
+                            <div className="pt-4 flex justify-between items-center mb-3">
                                 <span className="font-normal text-lg text-gray-900">Total</span>
                                 <span className="font-normal text-lg text-gray-900">${total.toFixed(2)}</span>
                             </div>
@@ -177,6 +185,7 @@ export default function PaymentPage() {
                                 </div>
                             </div>
                         </Tile>
+                        </PopInOutEffect>
                     </div>
                 </div>
             </div>
