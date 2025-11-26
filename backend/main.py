@@ -385,3 +385,400 @@ def get_me(current_user: dict = Depends(get_current_user)):
         is_active=current_user["is_active"]
     )
 
+# ===================================================================
+# PARKING SPOTS ENDPOINTS
+# ===================================================================
+
+@app.post("/spots", response_model=ParkingSpotOut, status_code=status.HTTP_201_CREATED)
+def create_parking_spot(
+    spot_data: ParkingSpotCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new parking spot (requires authentication)"""
+    try:
+        # Generate UUID for the spot
+        spot_id = str(uuid.uuid4())
+
+        # Create parking spot
+        new_spot = {
+            "id": spot_id,
+            "host_id": current_user["id"],
+            "street": spot_data.street,
+            "city": spot_data.city,
+            "province": spot_data.province,
+            "postal_code": spot_data.postal_code,
+            "country": spot_data.country,
+            "lat": spot_data.lat,
+            "lng": spot_data.lng,
+            "price_per_hour": spot_data.price_per_hour,
+            "created_at": datetime.utcnow().isoformat(),
+            "is_active": True
+        }
+
+        response = supabase.table("parking_spots_v2").insert(new_spot).execute()
+
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(status_code=500, detail="Failed to create parking spot")
+
+        created_spot = response.data[0]
+
+        # Insert availability intervals
+        if spot_data.availability_intervals:
+            intervals_to_insert = []
+            for interval in spot_data.availability_intervals:
+                intervals_to_insert.append({
+                    "spot_id": spot_id,
+                    "day": interval.day,
+                    "start_time": interval.start_time,
+                    "end_time": interval.end_time
+                })
+
+            if intervals_to_insert:
+                supabase.table("availability_intervals_v2").insert(intervals_to_insert).execute()
+
+        return ParkingSpotOut(
+            id=created_spot["id"],
+            host_id=created_spot["host_id"],
+            street=created_spot["street"],
+            city=created_spot["city"],
+            province=created_spot["province"],
+            postal_code=created_spot["postal_code"],
+            country=created_spot["country"],
+            lat=created_spot["lat"],
+            lng=created_spot["lng"],
+            price_per_hour=created_spot["price_per_hour"],
+            created_at=created_spot["created_at"],
+            is_active=created_spot["is_active"],
+            availability_intervals=[
+                AvailabilityInterval(
+                    day=i.day,
+                    start_time=i.start_time,
+                    end_time=i.end_time
+                ) for i in spot_data.availability_intervals
+            ] if spot_data.availability_intervals else []
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create parking spot: {str(e)}")
+
+@app.get("/spots", response_model=List[ParkingSpotOut])
+def list_parking_spots(
+    city: Optional[str] = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    is_active: Optional[bool] = True
+):
+    """List all parking spots with optional filters"""
+    try:
+        query = supabase.table("parking_spots_v2").select("*")
+
+        if is_active is not None:
+            query = query.eq("is_active", is_active)
+
+        if city:
+            query = query.ilike("city", f"%{city}%")
+
+        if min_price is not None:
+            query = query.gte("price_per_hour", min_price)
+
+        if max_price is not None:
+            query = query.lte("price_per_hour", max_price)
+
+        response = query.execute()
+
+        if not response.data:
+            return []
+
+        # Get availability intervals for each spot
+        result = []
+        for spot in response.data:
+            intervals_response = supabase.table("availability_intervals_v2")\
+                .select("*")\
+                .eq("spot_id", spot["id"])\
+                .execute()
+
+            availability_intervals = []
+            if intervals_response.data:
+                availability_intervals = [
+                    AvailabilityInterval(
+                        day=interval["day"],
+                        start_time=interval["start_time"],
+                        end_time=interval["end_time"]
+                    ) for interval in intervals_response.data
+                ]
+
+            result.append(ParkingSpotOut(
+                id=spot["id"],
+                host_id=spot["host_id"],
+                street=spot["street"],
+                city=spot["city"],
+                province=spot["province"],
+                postal_code=spot["postal_code"],
+                country=spot["country"],
+                lat=spot["lat"],
+                lng=spot["lng"],
+                price_per_hour=spot["price_per_hour"],
+                created_at=spot["created_at"],
+                is_active=spot["is_active"],
+                availability_intervals=availability_intervals
+            ))
+
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list parking spots: {str(e)}")
+
+@app.get("/spots/{spot_id}", response_model=ParkingSpotOut)
+def get_parking_spot(spot_id: str):
+    """Get a specific parking spot by ID"""
+    try:
+        response = supabase.table("parking_spots_v2").select("*").eq("id", spot_id).execute()
+
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(status_code=404, detail="Parking spot not found")
+
+        spot = response.data[0]
+
+        # Get availability intervals
+        intervals_response = supabase.table("availability_intervals_v2")\
+            .select("*")\
+            .eq("spot_id", spot_id)\
+            .execute()
+
+        availability_intervals = []
+        if intervals_response.data:
+            availability_intervals = [
+                AvailabilityInterval(
+                    day=interval["day"],
+                    start_time=interval["start_time"],
+                    end_time=interval["end_time"]
+                ) for interval in intervals_response.data
+            ]
+
+        return ParkingSpotOut(
+            id=spot["id"],
+            host_id=spot["host_id"],
+            street=spot["street"],
+            city=spot["city"],
+            province=spot["province"],
+            postal_code=spot["postal_code"],
+            country=spot["country"],
+            lat=spot["lat"],
+            lng=spot["lng"],
+            price_per_hour=spot["price_per_hour"],
+            created_at=spot["created_at"],
+            is_active=spot["is_active"],
+            availability_intervals=availability_intervals
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get parking spot: {str(e)}")
+
+# ===================================================================
+# BOOKINGS ENDPOINTS
+# ===================================================================
+
+@app.post("/bookings", response_model=BookingOut, status_code=status.HTTP_201_CREATED)
+def create_booking(
+    booking_data: BookingCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new booking (requires authentication)"""
+    try:
+        # Verify the parking spot exists
+        spot_response = supabase.table("parking_spots_v2").select("*").eq("id", booking_data.spot_id).execute()
+        if not spot_response.data or len(spot_response.data) == 0:
+            raise HTTPException(status_code=404, detail="Parking spot not found")
+
+        spot = spot_response.data[0]
+
+        # Check if spot is active
+        if not spot["is_active"]:
+            raise HTTPException(status_code=400, detail="Parking spot is not available")
+
+        # Parse times to calculate duration and total price
+        from datetime import datetime as dt
+        try:
+            start_dt = dt.strptime(booking_data.start_time, "%H:%M")
+            end_dt = dt.strptime(booking_data.end_time, "%H:%M")
+            duration_hours = (end_dt - start_dt).total_seconds() / 3600
+
+            if duration_hours <= 0:
+                raise HTTPException(status_code=400, detail="End time must be after start time")
+
+            total_price = duration_hours * spot["price_per_hour"]
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid time format. Use HH:MM")
+
+        # Check for conflicting bookings
+        existing_bookings = supabase.table("bookings_v2")\
+            .select("*")\
+            .eq("spot_id", booking_data.spot_id)\
+            .eq("booking_date", booking_data.booking_date)\
+            .in_("status", ["confirmed", "pending"])\
+            .execute()
+
+        if existing_bookings.data:
+            for existing in existing_bookings.data:
+                existing_start = dt.strptime(existing["start_time"], "%H:%M")
+                existing_end = dt.strptime(existing["end_time"], "%H:%M")
+
+                # Check for time overlap
+                if not (end_dt <= existing_start or start_dt >= existing_end):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="This time slot is already booked"
+                    )
+
+        # Generate UUID for the booking
+        booking_id = str(uuid.uuid4())
+
+        # Create booking
+        new_booking = {
+            "id": booking_id,
+            "spot_id": booking_data.spot_id,
+            "user_id": current_user["id"],
+            "booking_date": booking_data.booking_date,
+            "start_time": booking_data.start_time,
+            "end_time": booking_data.end_time,
+            "total_price": total_price,
+            "status": "confirmed",
+            "created_at": datetime.utcnow().isoformat()
+        }
+
+        response = supabase.table("bookings_v2").insert(new_booking).execute()
+
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(status_code=500, detail="Failed to create booking")
+
+        created_booking = response.data[0]
+
+        return BookingOut(
+            id=created_booking["id"],
+            spot_id=created_booking["spot_id"],
+            user_id=created_booking["user_id"],
+            booking_date=created_booking["booking_date"],
+            start_time=created_booking["start_time"],
+            end_time=created_booking["end_time"],
+            total_price=created_booking["total_price"],
+            status=created_booking["status"],
+            created_at=created_booking["created_at"]
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create booking: {str(e)}")
+
+@app.get("/bookings", response_model=List[BookingOut])
+def list_user_bookings(
+    current_user: dict = Depends(get_current_user),
+    status_filter: Optional[str] = None
+):
+    """List all bookings for the current authenticated user"""
+    try:
+        query = supabase.table("bookings_v2").select("*").eq("user_id", current_user["id"])
+
+        if status_filter:
+            query = query.eq("status", status_filter)
+
+        # Order by booking date and start time (most recent first)
+        query = query.order("booking_date", desc=True).order("start_time", desc=True)
+
+        response = query.execute()
+
+        if not response.data:
+            return []
+
+        return [
+            BookingOut(
+                id=booking["id"],
+                spot_id=booking["spot_id"],
+                user_id=booking["user_id"],
+                booking_date=booking["booking_date"],
+                start_time=booking["start_time"],
+                end_time=booking["end_time"],
+                total_price=booking["total_price"],
+                status=booking["status"],
+                created_at=booking["created_at"]
+            ) for booking in response.data
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list bookings: {str(e)}")
+
+@app.get("/bookings/{booking_id}", response_model=BookingOut)
+def get_booking(
+    booking_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get a specific booking by ID (must be owned by current user)"""
+    try:
+        response = supabase.table("bookings_v2").select("*").eq("id", booking_id).execute()
+
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(status_code=404, detail="Booking not found")
+
+        booking = response.data[0]
+
+        # Verify the booking belongs to the current user
+        if booking["user_id"] != current_user["id"]:
+            raise HTTPException(status_code=403, detail="You don't have permission to access this booking")
+
+        return BookingOut(
+            id=booking["id"],
+            spot_id=booking["spot_id"],
+            user_id=booking["user_id"],
+            booking_date=booking["booking_date"],
+            start_time=booking["start_time"],
+            end_time=booking["end_time"],
+            total_price=booking["total_price"],
+            status=booking["status"],
+            created_at=booking["created_at"]
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get booking: {str(e)}")
+
+@app.delete("/bookings/{booking_id}", status_code=status.HTTP_200_OK)
+def cancel_booking(
+    booking_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Cancel a booking (must be owned by current user)"""
+    try:
+        # Get the booking first
+        response = supabase.table("bookings_v2").select("*").eq("id", booking_id).execute()
+
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(status_code=404, detail="Booking not found")
+
+        booking = response.data[0]
+
+        # Verify the booking belongs to the current user
+        if booking["user_id"] != current_user["id"]:
+            raise HTTPException(status_code=403, detail="You don't have permission to cancel this booking")
+
+        # Check if booking is already cancelled
+        if booking["status"] == "cancelled":
+            raise HTTPException(status_code=400, detail="Booking is already cancelled")
+
+        # Update booking status to cancelled
+        update_response = supabase.table("bookings_v2")\
+            .update({"status": "cancelled"})\
+            .eq("id", booking_id)\
+            .execute()
+
+        if not update_response.data or len(update_response.data) == 0:
+            raise HTTPException(status_code=500, detail="Failed to cancel booking")
+
+        return {
+            "success": True,
+            "message": "Booking cancelled successfully",
+            "booking_id": booking_id
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to cancel booking: {str(e)}")
+
