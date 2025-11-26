@@ -8,7 +8,7 @@ import CustomInput from '@/components/CustomInput';
 import PasswordInput from '@/components/PasswordInput';
 import MapComponent from '@/components/MapComponent';
 import { PopInOutEffect } from '@/components/PopInOutEffect';
-import { MoveLeft } from 'lucide-react';
+import { Home } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store';
 
@@ -79,7 +79,7 @@ export default function SignUp() {
       <div className="relative z-10 min-h-screen w-full flex items-center justify-center">
         <div className="absolute top-5 left-5">
           <Button2 onClick={() => router.push('/')}>
-            <MoveLeft size={18} className="mr-2" />
+            <Home size={18} className="mr-2" />
             Home
           </Button2>
         </div>
