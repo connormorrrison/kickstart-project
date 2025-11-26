@@ -3,142 +3,91 @@
 import { useStore } from '@/lib/store';
 import { X, Star, MapPin, Clock, Shield } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useRouter } from 'next/navigation';
-import MapPreview from './MapPreview';
+import Tile from '@/components/Tile';
+import Button1 from '@/components/Button1';
+import { formatAddress } from '@/lib/addressUtils';
 
 export default function SpotDetail() {
     const { selectedSpot, setSelectedSpot, user, setAuthModalOpen } = useStore();
 
-    const router = useRouter();
-
     if (!selectedSpot) return null;
 
     const handleBook = () => {
-        router.push('/user/payment');
+        if (!user) {
+            setAuthModalOpen(true);
+        } else {
+            alert('Proceeding to payment...');
+        }
     };
 
     return (
-        <div style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            zIndex: 20,
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            pointerEvents: 'none'
-        }}>
+        <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
             <div
-                style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: '100%',
-                    background: 'rgba(0,0,0,0.3)',
-                    pointerEvents: 'auto'
-                }}
+                className="absolute inset-0 bg-black/30 pointer-events-auto"
                 onClick={() => setSelectedSpot(null)}
             />
             <motion.div
                 initial={{ opacity: 0, y: 50, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 50, scale: 0.95 }}
-                style={{
-                    width: '90%',
-                    maxWidth: '600px',
-                    background: 'white',
-                    borderRadius: '16px',
-                    overflow: 'hidden',
-                    boxShadow: '0 10px 40px rgba(0,0,0,0.2)',
-                    zIndex: 21,
-                    pointerEvents: 'auto',
-                    maxHeight: '90vh',
-                    display: 'flex',
-                    flexDirection: 'column'
-                }}
+                className="w-[90%] max-w-[600px] z-21 pointer-events-auto max-h-[90vh] flex flex-col"
             >
-                <div style={{ position: 'relative', height: '250px' }}>
-                    <MapPreview lat={selectedSpot.lat} lng={selectedSpot.lng} height="250px" />
-                    <button
-                        onClick={() => setSelectedSpot(null)}
-                        style={{
-                            position: 'absolute',
-                            top: '15px',
-                            right: '15px',
-                            background: 'white',
-                            borderRadius: '50%',
-                            width: '32px',
-                            height: '32px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                            zIndex: 10
-                        }}
-                    >
-                        <X size={18} />
-                    </button>
-                </div>
-
-                <div style={{ padding: '24px', overflowY: 'auto' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '10px' }}>
-                        <h2 style={{ fontSize: '1.5rem', fontWeight: 700 }}>{selectedSpot.title}</h2>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}>
-                            <Star size={16} fill="black" /> 4.8
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#666', marginBottom: '20px' }}>
-                        <MapPin size={16} />
-                        <span>{selectedSpot.address}</span>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '15px', marginBottom: '24px' }}>
-                        <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px', flex: 1 }}>
-                            <Clock size={20} style={{ marginBottom: '8px', color: '#666' }} />
-                            <div style={{ fontSize: '0.8rem', color: '#666' }}>Available</div>
-                            <div style={{ fontWeight: 600 }}>{selectedSpot.availableStart} - {selectedSpot.availableEnd}</div>
-                            {selectedSpot.availableDateStart && (
-                                <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '4px' }}>
-                                    {new Date(selectedSpot.availableDateStart + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-                                </div>
-                            )}
-                        </div>
-                        <div style={{ background: '#f5f5f5', padding: '12px', borderRadius: '8px', flex: 1 }}>
-                            <Shield size={20} style={{ marginBottom: '8px', color: '#666' }} />
-                            <div style={{ fontSize: '0.8rem', color: '#666' }}>Security</div>
-                            <div style={{ fontWeight: 600 }}>Verified Host</div>
-                        </div>
-                    </div>
-
-                    <p style={{ lineHeight: 1.6, color: '#444', marginBottom: '24px' }}>
-                        {selectedSpot.description}
-                    </p>
-
-                    <div style={{ borderTop: '1px solid #eee', paddingTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div>
-                            <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>${selectedSpot.pricePerHour}</div>
-                            <div style={{ fontSize: '0.9rem', color: '#666' }}>per hour</div>
-                        </div>
+                <Tile className="overflow-hidden p-0">
+                    <div className="relative h-[250px]">
+                        <img
+                            src={selectedSpot.images[0]}
+                            alt={selectedSpot.title}
+                            className="w-full h-full object-cover"
+                        />
                         <button
-                            onClick={handleBook}
-                            style={{
-                                background: 'black',
-                                color: 'white',
-                                padding: '14px 32px',
-                                borderRadius: '8px',
-                                fontWeight: 600,
-                                fontSize: '1rem',
-                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-                            }}
+                            onClick={() => setSelectedSpot(null)}
+                            className="absolute top-4 right-4 bg-white rounded-full w-8 h-8 flex items-center justify-center shadow-sm"
                         >
-                            Book Spot
+                            <X size={18} />
                         </button>
                     </div>
-                </div>
+
+                    <div className="p-6 overflow-y-auto">
+                        <div className="flex justify-between items-start mb-2.5">
+                            <h2 className="text-2xl font-bold">{selectedSpot.title}</h2>
+                            <div className="flex items-center gap-1 font-semibold">
+                                <Star size={16} fill="black" /> 4.8
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 text-gray-600 mb-5">
+                            <MapPin size={16} />
+                            <span>{formatAddress(selectedSpot)}</span>
+                        </div>
+
+                        <div className="flex gap-4 mb-6">
+                            <div className="bg-gray-100 p-3 rounded-lg flex-1">
+                                <Clock size={20} className="mb-2 text-gray-600" />
+                                <div className="text-xs text-gray-600">Available</div>
+                                <div className="font-semibold">{selectedSpot.availableStart} - {selectedSpot.availableEnd}</div>
+                            </div>
+                            <div className="bg-gray-100 p-3 rounded-lg flex-1">
+                                <Shield size={20} className="mb-2 text-gray-600" />
+                                <div className="text-xs text-gray-600">Security</div>
+                                <div className="font-semibold">Verified Host</div>
+                            </div>
+                        </div>
+
+                        <p className="leading-relaxed text-gray-700 mb-6">
+                            {selectedSpot.description}
+                        </p>
+
+                        <div className="border-t border-gray-200 pt-5 flex items-center justify-between">
+                            <div>
+                                <div className="text-2xl font-bold">${selectedSpot.pricePerHour}</div>
+                                <div className="text-sm text-gray-600">per hour</div>
+                            </div>
+                            <Button1 onClick={handleBook}>
+                                Book Spot
+                            </Button1>
+                        </div>
+                    </div>
+                </Tile>
             </motion.div>
         </div>
     );

@@ -1,399 +1,351 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
-import { X } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Plus } from 'lucide-react';
+import { useStore } from '@/lib/store';
+
+// UI Components
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import CustomInput from '@/components/CustomInput';
+import Button1 from '@/components/Button1';
+import Button2 from '@/components/Button2';
+
+// Custom Logic Components
 import AvailabilityPicker from './AvailabilityPicker';
 import AddressMapPreview from './AddressMapPreview';
 
+// Helper Component for Title2
+const Title2 = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
+  <h2 className={`text-xl font-normal text-gray-900 ${className}`}>{children}</h2>
+);
+
 interface AddListingModalProps {
-    isOpen: boolean;
-    onClose: () => void;
+  isOpen: boolean;
+  onClose: (open: boolean) => void;
+  onListingAdded?: () => void;
 }
 
 interface TimeSlot {
-    day: string;
-    hour: string;
-    hourNum: number; // 12-23 for 12 PM - 11 PM
+  day: string;
+  hour: string;
+  hourNum: number;
 }
 
 interface GroupedTimeRange {
-    day: string;
-    startHour: string;
-    endHour: string;
+  day: string;
+  startHour: string;
+  endHour: string;
 }
 
-interface BackendTimeSlot {
-    date: string; // yyyy-mm-dd format
-    start: number; // Start hour as integer (24-hour format)
-    end: number; // End hour as integer (24-hour format)
-}
+export default function AddListingModal({ isOpen, onClose, onListingAdded }: AddListingModalProps) {
+  const { user } = useStore();
+  
+  // Split Address State
+  const [street, setStreet] = useState('');
+  const [city, setCity] = useState('Vancouver');
+  const [province, setProvince] = useState('BC');
+  const [postalCode, setPostalCode] = useState('');
+  const [country, setCountry] = useState('Canada');
+  
+  const [rate, setRate] = useState<string>('10');
+  const [coordinates, setCoordinates] = useState({ lat: 49.2827, lng: -123.1207 });
+  const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-export default function AddListingModal({ isOpen, onClose }: AddListingModalProps) {
-    const [address, setAddress] = useState('');
-    const [rate, setRate] = useState(10); // Default to $10
-    const [coordinates, setCoordinates] = useState({ lat: 49.2827, lng: -123.1207 }); // Default: Vancouver
-    const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [submitError, setSubmitError] = useState<string | null>(null);
+  // Derived full address for Geocoding
+  const fullAddress = useMemo(() => {
+    return [street, city, province, postalCode, country].filter(Boolean).join(', ');
+  }, [street, city, province, postalCode, country]);
 
-    // Calculate booking likelihood (inverse of price)
-    const bookingLikelihood = Math.round(100 - (rate / 20 * 100));
+  // Calculate booking likelihood
+  const numericRate = parseFloat(rate) || 0;
+  const bookingLikelihood = Math.max(0, Math.round(100 - (numericRate / 50 * 100)));
 
-    const handleCoordinatesChange = useCallback((lat: number, lng: number) => {
-        setCoordinates({ lat, lng });
-    }, []);
+  const handleCoordinatesChange = useCallback((lat: number, lng: number) => {
+    setCoordinates({ lat, lng });
+  }, []);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsSubmitting(true);
-        setSubmitError(null);
+  function parseTimeToHour(time: string): number {
+    const match = time.match(/(\d+):00 (AM|PM)/);
+    if (!match) return 0;
+    let hour = parseInt(match[1]);
+    const period = match[2];
+    if (period === 'PM' && hour !== 12) hour += 12;
+    if (period === 'AM' && hour === 12) hour = 0;
+    return hour;
+  }
 
-        try {
-            // Send each time range as a separate posting
-            const promises = backendFormattedData.map(async (timeRange) => {
-                const response = await fetch('http://localhost:8000/postings/create', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        username: 'testing1',
-                        password_hash: 'abc',
-                        address: address,
-                        lat: coordinates.lat,
-                        lng: coordinates.lng,
-                        price: rate,
-                        date: timeRange.date,
-                        start: timeRange.start,
-                        end: timeRange.end,
-                    }),
-                });
+  function formatEndHour(startHourNum: number): string {
+    const endHourNum = startHourNum + 1;
+    if (endHourNum === 0 || endHourNum === 24) return '12:00 AM';
+    else if (endHourNum < 12) return `${endHourNum}:00 AM`;
+    else if (endHourNum === 12) return '12:00 PM';
+    else return `${endHourNum - 12}:00 PM`;
+  }
 
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Failed to create posting');
-                }
+  function getNextDateForDay(dayName: string): string {
+    const dayOrder = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const targetDay = dayOrder.indexOf(dayName);
+    const today = new Date();
+    const currentDay = today.getDay();
+    let daysUntil = targetDay - currentDay;
+    if (daysUntil <= 0) daysUntil += 7;
+    const targetDate = new Date(today);
+    targetDate.setDate(today.getDate() + daysUntil);
+    const year = targetDate.getFullYear();
+    const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const day = String(targetDate.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
 
-                return response.json();
-            });
+  const groupedTimeRanges = useMemo(() => {
+    const slots: TimeSlot[] = Array.from(selectedSlots).map(slot => {
+      const [day, time] = slot.split('-');
+      const hourNum = parseTimeToHour(time);
+      return { day, hour: time, hourNum };
+    });
 
-            await Promise.all(promises);
+    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    slots.sort((a, b) => {
+      const dayDiff = dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day);
+      if (dayDiff !== 0) return dayDiff;
+      return a.hourNum - b.hourNum;
+    });
 
-            // Success! Reset form and close modal
-            setAddress('');
-            setRate(10);
-            setCoordinates({ lat: 49.2827, lng: -123.1207 });
-            setSelectedSlots(new Set());
-            alert(`Successfully created ${backendFormattedData.length} listing(s)!`);
-            onClose();
-        } catch (error) {
-            console.error('Error creating listing:', error);
-            setSubmitError(error instanceof Error ? error.message : 'Failed to create listing');
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
+    const grouped: GroupedTimeRange[] = [];
+    let currentRange: GroupedTimeRange | null = null;
 
-    // Parse time slots and group consecutive hours into ranges
-    const groupedTimeRanges = useMemo(() => {
-        // Parse selected slots (format: "Monday-12:00 PM")
-        const slots: TimeSlot[] = Array.from(selectedSlots).map(slot => {
-            const [day, time] = slot.split('-');
-            const hourNum = parseTimeToHour(time);
-            return { day, hour: time, hourNum };
-        });
-
-        // Sort by day order and hour
-        const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-        slots.sort((a, b) => {
-            const dayDiff = dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day);
-            if (dayDiff !== 0) return dayDiff;
-            return a.hourNum - b.hourNum;
-        });
-
-        // Group consecutive hours by day
-        const grouped: GroupedTimeRange[] = [];
-        let currentRange: GroupedTimeRange | null = null;
-
-        for (const slot of slots) {
-            if (!currentRange || currentRange.day !== slot.day ||
-                parseTimeToHour(currentRange.endHour) !== slot.hourNum) {
-                // Start a new range
-                if (currentRange) grouped.push(currentRange);
-                currentRange = {
-                    day: slot.day,
-                    startHour: slot.hour,
-                    endHour: formatEndHour(slot.hourNum)
-                };
-            } else {
-                // Extend the current range
-                currentRange.endHour = formatEndHour(slot.hourNum);
-            }
-        }
+    for (const slot of slots) {
+      if (!currentRange || currentRange.day !== slot.day ||
+        parseTimeToHour(currentRange.endHour) !== slot.hourNum) {
         if (currentRange) grouped.push(currentRange);
+        currentRange = {
+          day: slot.day,
+          startHour: slot.hour,
+          endHour: formatEndHour(slot.hourNum)
+        };
+      } else {
+        currentRange.endHour = formatEndHour(slot.hourNum);
+      }
+    }
+    if (currentRange) grouped.push(currentRange);
 
-        return grouped;
-    }, [selectedSlots]);
+    return grouped;
+  }, [selectedSlots]);
 
-    // Convert "12:00 PM" format to hour number (12-23)
-    function parseTimeToHour(time: string): number {
-        const match = time.match(/(\d+):00 (AM|PM)/);
-        if (!match) return 0;
-        let hour = parseInt(match[1]);
-        const period = match[2];
-        if (period === 'PM' && hour !== 12) hour += 12;
-        if (period === 'AM' && hour === 12) hour = 0;
-        return hour;
+  // Convert to API format for availability intervals
+  const availabilityIntervals = useMemo(() => {
+    return groupedTimeRanges.map(range => ({
+      day: range.day,
+      start_time: range.startHour.replace(' ', '').toLowerCase(), // "10:00 AM" -> "10:00am"
+      end_time: range.endHour.replace(' ', '').toLowerCase(),
+    }));
+  }, [groupedTimeRanges]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!user) {
+      setSubmitError('You must be logged in to create a listing');
+      return;
     }
 
-    // Format the end hour (adds 1 hour to the selected hour)
-    function formatEndHour(startHourNum: number): string {
-        const endHourNum = startHourNum + 1;
-
-        if (endHourNum === 0 || endHourNum === 24) {
-            return '12:00 AM'; // Midnight
-        } else if (endHourNum < 12) {
-            return `${endHourNum}:00 AM`; // 1 AM - 11 AM
-        } else if (endHourNum === 12) {
-            return '12:00 PM'; // Noon
-        } else {
-            return `${endHourNum - 12}:00 PM`; // 1 PM - 11 PM
-        }
+    if (selectedSlots.size === 0) {
+      setSubmitError('Please select at least one availability time slot');
+      return;
     }
 
-    // Convert day name to next occurrence date (yyyy-mm-dd format)
-    function getNextDateForDay(dayName: string): string {
-        const dayOrder = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-        const targetDay = dayOrder.indexOf(dayName);
-        const today = new Date();
-        const currentDay = today.getDay();
+    setIsSubmitting(true);
+    setSubmitError(null);
 
-        // Calculate days until target day
-        let daysUntil = targetDay - currentDay;
-        if (daysUntil <= 0) daysUntil += 7; // Next week if day has passed
+    try {
+      const { spotsApi } = await import('@/lib/api');
 
-        const targetDate = new Date(today);
-        targetDate.setDate(today.getDate() + daysUntil);
+      // Create the parking spot
+      const newSpot = await spotsApi.create({
+        street,
+        city,
+        province,
+        postal_code: postalCode,
+        country,
+        lat: coordinates.lat,
+        lng: coordinates.lng,
+        price_per_hour: numericRate,
+        availability_intervals: availabilityIntervals,
+      });
 
-        // Format as yyyy-mm-dd
-        const year = targetDate.getFullYear();
-        const month = String(targetDate.getMonth() + 1).padStart(2, '0');
-        const day = String(targetDate.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
+      // Reset form
+      setStreet('');
+      setPostalCode('');
+      setRate('10');
+      setCoordinates({ lat: 49.2827, lng: -123.1207 });
+      setSelectedSlots(new Set());
+
+      if (onListingAdded) {
+        onListingAdded();
+      }
+      onClose(false);
+    } catch (error) {
+      console.error('Error creating listing:', error);
+      setSubmitError(error instanceof Error ? error.message : 'Failed to create listing');
+    } finally {
+      setIsSubmitting(false);
     }
+  };
 
-    // Convert selected slots to backend format
-    // Each time range becomes one posting with start: int, end: int
-    const backendFormattedData = useMemo(() => {
-        return groupedTimeRanges.map(range => {
-            const date = getNextDateForDay(range.day);
-            const startHour = parseTimeToHour(range.startHour);
-            const endHour = parseTimeToHour(range.endHour);
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto sm:rounded-xl">
+        <DialogHeader>
+          <DialogTitle className="font-normal text-2xl">Add New Listing</DialogTitle>
+          <DialogDescription className="text-base text-gray-500">
+            Enter the details for your parking spot to start earning
+          </DialogDescription>
+        </DialogHeader>
+        
+        <form onSubmit={handleSubmit} className="grid gap-8 py-4">
+          
+          {/* Address Section */}
+          <div className="grid gap-4">
+            <Title2>Address</Title2>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <CustomInput 
+                  placeholder="Street Address" 
+                  value={street}
+                  onChange={(e) => setStreet(e.target.value)}
+                  className="rounded-xl"
+                  required
+                />
+              </div>
+              <CustomInput 
+                placeholder="City" 
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                className="rounded-xl"
+                required
+              />
+              <CustomInput 
+                placeholder="Province / State" 
+                value={province}
+                onChange={(e) => setProvince(e.target.value)}
+                className="rounded-xl"
+                required
+              />
+              <CustomInput 
+                placeholder="Postal / Zip Code" 
+                value={postalCode}
+                onChange={(e) => setPostalCode(e.target.value)}
+                className="rounded-xl"
+                required
+              />
+              <CustomInput 
+                placeholder="Country" 
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+                className="rounded-xl"
+                required
+              />
+            </div>
+            
+            <div className="rounded-xl overflow-hidden border border-gray-100 mt-2">
+              <AddressMapPreview
+                address={fullAddress}
+                onCoordinatesChange={handleCoordinatesChange}
+              />
+            </div>
+          </div>
 
-            return {
-                date,
-                start: startHour,  // Integer (not array)
-                end: endHour       // Integer (not array)
-            };
-        });
-    }, [groupedTimeRanges]);
+          {/* Rate Section */}
+          <div className="grid gap-4">
+            <Title2>Hourly Rate</Title2>
+            <div className="flex items-start gap-4">
+              <div className="relative w-full">
+                {/* Vertically centered dollar sign */}
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">$</span>
+                <CustomInput
+                  type="number"
+                  min="0"
+                  max="200"
+                  step="1"
+                  value={rate}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '' || (parseFloat(val) >= 0 && parseFloat(val) <= 200)) {
+                      setRate(val);
+                    }
+                  }}
+                  className="pl-7 rounded-xl"
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+              <div className="flex flex-col justify-center h-10 min-w-[140px]">
+                <span className={`text-base font-normal ${bookingLikelihood > 70 ? 'text-green-600' : bookingLikelihood > 30 ? 'text-amber-500' : 'text-red-600'}`}>
+                  {bookingLikelihood}% likely to book
+                </span>
+              </div>
+            </div>
+          </div>
 
-    if (!isOpen) return null;
+          {/* Availability Picker */}
+          <div className="grid gap-4">
+            <Title2>Availability</Title2>
+            <AvailabilityPicker
+              selectedSlots={selectedSlots}
+              onSlotsChange={setSelectedSlots}
+            />
+          </div>
 
-    return (
-        <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            zIndex: 50,
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            background: 'rgba(0,0,0,0.5)'
-        }}>
-            <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                style={{
-                    background: 'white',
-                    padding: '30px',
-                    borderRadius: '16px',
-                    width: '90%',
-                    maxWidth: '500px',
-                    maxHeight: '90vh',
-                    overflow: 'auto',
-                    position: 'relative'
-                }}
-            >
-                <button
-                    onClick={onClose}
-                    style={{ position: 'absolute', top: '20px', right: '20px', color: '#666', cursor: 'pointer' }}
-                >
-                    <X size={20} />
-                </button>
-
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '20px' }}>Add New Listing</h2>
-
-                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    {/* Address */}
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '1rem', fontWeight: 500 }}>Address</label>
-                        <input
-                            required
-                            type="text"
-                            value={address}
-                            onChange={(e) => setAddress(e.target.value)}
-                            placeholder="e.g. 1234 Main St, Vancouver, BC"
-                            style={{
-                                width: '100%',
-                                padding: '12px',
-                                borderRadius: '8px',
-                                border: '1px solid #e5e5e5',
-                                fontSize: '1rem'
-                            }}
-                        />
-                    </div>
-
-                    {/* Map Preview */}
-                    <AddressMapPreview
-                        address={address}
-                        onCoordinatesChange={handleCoordinatesChange}
-                    />
-
-                    {/* Rate Slider */}
-                    <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                            <label style={{ fontSize: '1rem', fontWeight: 500 }}>Hourly Rate</label>
-                            <div style={{ textAlign: 'right' }}>
-                                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#111827' }}>${rate.toFixed(2)}</div>
-                                <div style={{ fontSize: '0.75rem', color: bookingLikelihood > 70 ? '#059669' : bookingLikelihood > 30 ? '#f59e0b' : '#dc2626' }}>
-                                    {bookingLikelihood}% customers likely to book
-                                </div>
-                            </div>
-                        </div>
-                        <input
-                            type="range"
-                            min="0"
-                            max="20"
-                            step="0.5"
-                            value={rate}
-                            onChange={(e) => setRate(parseFloat(e.target.value))}
-                            style={{
-                                width: '100%',
-                                height: '8px',
-                                borderRadius: '4px',
-                                background: `linear-gradient(to right, #059669 0%, #f59e0b 50%, #dc2626 100%)`,
-                                outline: 'none',
-                                cursor: 'pointer'
-                            }}
-                        />
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '0.75rem', color: '#6b7280' }}>
-                            <span>$0</span>
-                            <span>$20</span>
-                        </div>
-                    </div>
-
-                    {/* Availability Picker */}
-                    <AvailabilityPicker
-                        selectedSlots={selectedSlots}
-                        onSlotsChange={setSelectedSlots}
-                    />
-
-                    {/* Times Selected Display */}
-                    {groupedTimeRanges.length > 0 && (
-                        <div style={{ marginTop: '20px' }}>
-                            <label style={{ display: 'block', marginBottom: '12px', fontSize: '1rem', fontWeight: 600 }}>
-                                Times Selected
-                            </label>
-                            <div style={{
-                                background: '#f9fafb',
-                                border: '1px solid #e5e7eb',
-                                borderRadius: '8px',
-                                padding: '16px',
-                                maxHeight: '200px',
-                                overflow: 'auto'
-                            }}>
-                                {groupedTimeRanges.map((range, index) => (
-                                    <div
-                                        key={index}
-                                        style={{
-                                            padding: '8px 0',
-                                            fontSize: '0.95rem',
-                                            color: '#374151',
-                                            borderBottom: index < groupedTimeRanges.length - 1 ? '1px solid #e5e7eb' : 'none'
-                                        }}
-                                    >
-                                        <span style={{ fontWeight: 500 }}>{range.day}</span>
-                                        <span style={{ color: '#6b7280' }}>, </span>
-                                        <span>{range.startHour} - {range.endHour}</span>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {/* Backend Format Preview (for debugging) */}
-                            <details style={{ marginTop: '12px' }}>
-                                <summary style={{
-                                    fontSize: '0.85rem',
-                                    color: '#6b7280',
-                                    cursor: 'pointer',
-                                    userSelect: 'none'
-                                }}>
-                                    View Backend Format
-                                </summary>
-                                <pre style={{
-                                    marginTop: '8px',
-                                    padding: '12px',
-                                    background: '#1f2937',
-                                    color: '#10b981',
-                                    borderRadius: '6px',
-                                    fontSize: '0.75rem',
-                                    overflow: 'auto',
-                                    maxHeight: '150px'
-                                }}>
-                                    {JSON.stringify(backendFormattedData, null, 2)}
-                                </pre>
-                            </details>
-                        </div>
-                    )}
-
-                    {submitError && (
-                        <div style={{
-                            background: '#fee2e2',
-                            border: '1px solid #fca5a5',
-                            color: '#dc2626',
-                            padding: '12px',
-                            borderRadius: '8px',
-                            fontSize: '0.9rem'
-                        }}>
-                            {submitError}
-                        </div>
-                    )}
-
-                    <button
-                        type="submit"
-                        disabled={selectedSlots.size === 0 || isSubmitting}
-                        style={{
-                            width: '100%',
-                            background: (selectedSlots.size === 0 || isSubmitting) ? '#d1d5db' : 'black',
-                            color: 'white',
-                            padding: '14px',
-                            borderRadius: '8px',
-                            fontWeight: 600,
-                            fontSize: '1rem',
-                            marginTop: '10px',
-                            cursor: (selectedSlots.size === 0 || isSubmitting) ? 'not-allowed' : 'pointer',
-                            opacity: (selectedSlots.size === 0 || isSubmitting) ? 0.6 : 1,
-                            transition: 'all 0.2s'
-                        }}
+          {/* Times Selected Display */}
+          {groupedTimeRanges.length > 0 && (
+            <div className="grid gap-4">
+              <Title2>Times Selected</Title2>
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                <div className="max-h-40 overflow-auto space-y-2">
+                  {groupedTimeRanges.map((range, index) => (
+                    <div
+                      key={index}
+                      className="text-base font-normal text-gray-900 pb-2 border-b border-gray-200 last:border-0 last:pb-0"
                     >
-                        {isSubmitting ? 'Creating listings...' : selectedSlots.size === 0 ? 'Select availability to continue' : 'Add Listing'}
-                    </button>
-                </form>
-            </motion.div>
-        </div>
-    );
+                      <span className="font-medium">{range.day},</span>
+                      <span className="ml-1">{range.startHour} - {range.endHour}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {submitError && (
+            <div className="p-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm">
+              {submitError}
+            </div>
+          )}
+
+          {/* Footer Spacing */}
+          <DialogFooter className="gap-3 sm:gap-3 pt-4">
+            <Button2 type="button" onClick={() => onClose(false)}>
+              Cancel
+            </Button2>
+            <Button1 
+              type="submit" 
+              disabled={selectedSlots.size === 0 || isSubmitting}
+            >
+              <Plus size={18} className="mr-2" />
+              {isSubmitting ? 'Creating...' : 'Add Listing'}
+            </Button1>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
 }

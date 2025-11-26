@@ -1,24 +1,31 @@
 export interface ParkingSpot {
     id: string;
-    title: string;
-    description: string;
-    address: string;
+    street: string;
+    city: string;
+    province: string;
+    postalCode: string;
+    postal_code?: string; // API returns this
+    country: string;
     lat: number;
     lng: number;
     pricePerHour: number;
-    hostId: string;
-    availableStart: string; // ISO time string
-    availableEnd: string; // ISO time string
-    availableDateStart?: string; // YYYY-MM-DD
-    availableDateEnd?: string; // YYYY-MM-DD
-    images: string[];
+    price_per_hour?: number; // API returns this
+    hostId: number;
+    host_id?: number; // API returns this
+    hostName?: string;
+    is_active?: boolean;
+    created_at?: string;
+    availabilityIntervals?: Array<{ day: string; start: string; end: string; start_time?: string; end_time?: string }>;
+    availability_intervals?: Array<{ day: string; start_time: string; end_time: string }>; // API returns this
 }
 
 export interface User {
-    id: string;
-    name: string;
+    id: number;
+    first_name: string;
+    last_name: string;
     email: string;
-    isHost: boolean;
+    created_at: string;
+    is_active: boolean;
 }
 
 export interface Booking {

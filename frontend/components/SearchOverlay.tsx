@@ -1,168 +1,298 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-
+import * as React from 'react';
+import { useRouter } from 'next/navigation';
+import { ChevronDownIcon, User, Shield } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useStore } from '@/lib/store';
-import { Calendar, Clock, User as UserIcon } from 'lucide-react';
-import Button1 from './Button1';
+import Button1 from '@/components/Button1';
+import DatePickerButton from '@/components/DatePickerButton';
+import DateCalendar from '@/components/DateCalendar';
+import Tile from '@/components/Tile';
+import TimeInput from '@/components/TimeInput';
+import Title2 from '@/components/Title2';
+import { PopInOutEffect } from '@/components/PopInOutEffect';
+import { Popover, PopoverTrigger } from '@/components/ui/popover';
+import PopoverContent1 from '@/components/PopoverContent1';
+
+// Helper to format the full address string
+const formatAddress = (spot: any) => {
+  if (!spot) return '';
+  if (spot.street && spot.city) {
+    return `${spot.street}, ${spot.city}, ${spot.province}`;
+  }
+  return spot.address || '';
+};
+
+// Helper function to format time
+const formatTime = (time: string) => {
+  if (!time) return '';
+  const match = time.match(/(\d{1,2}):(\d{2})\s*(am|pm|AM|PM)?/i);
+  if (!match) return time;
+  const [, hours, minutes, period] = match;
+  const formattedPeriod = period ? period.toUpperCase() : '';
+  return `${hours}:${minutes} ${formattedPeriod}`.trim();
+};
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+interface AvailableSlot {
+  start_time: string;
+  end_time: string;
+}
+
+interface AvailabilityData {
+  date: string;
+  day: string;
+  available_slots: AvailableSlot[];
+}
 
 export default function SearchOverlay() {
-    const { searchCriteria, setSearchCriteria, setAuthModalOpen, setFilterActive } = useStore();
-    const [localDate, setLocalDate] = useState(searchCriteria.date);
-    const [localStartTime, setLocalStartTime] = useState(searchCriteria.startTime);
-    const [localEndTime, setLocalEndTime] = useState(searchCriteria.endTime);
+  const router = useRouter();
+  const [date, setDate] = React.useState<Date | undefined>(undefined);
 
-    // Sync local state if store changes externally (optional but good practice)
-    useEffect(() => {
-        setLocalDate(searchCriteria.date);
-        setLocalStartTime(searchCriteria.startTime);
-        setLocalEndTime(searchCriteria.endTime);
-    }, [searchCriteria]);
+  const [startTime, setStartTime] = React.useState('');
+  const [endTime, setEndTime] = React.useState('');
 
-    const [isLoading, setIsLoading] = useState(false);
-    const [isHovered, setIsHovered] = useState(false);
+  const [isDatePickerOpen, setIsDatePickerOpen] = React.useState(false);
+  const [isVisible, setIsVisible] = React.useState(false);
+  const [isSearchActive, setIsSearchActive] = React.useState(false);
+  const [availability, setAvailability] = React.useState<AvailabilityData | null>(null);
+  const [isLoadingAvailability, setIsLoadingAvailability] = React.useState(false);
 
-    const handleSearch = async () => {
-        setIsLoading(true);
-        // Simulate loading delay for better UX
-        await new Promise(resolve => setTimeout(resolve, 600));
+  const { selectedSpot, setSelectedSpot, user, setAuthModalOpen, setSearchCriteria } = useStore();
 
-        setSearchCriteria({
-            date: localDate,
-            startTime: localStartTime,
-            endTime: localEndTime
-        });
-        setFilterActive(true);
-        setIsLoading(false);
+  React.useEffect(() => {
+    setIsVisible(true);
+    // RESET: Ensure we start small (no selected spot) whenever this component mounts
+    setSelectedSpot(null);
+  }, [setSelectedSpot]);
+
+  const [displaySpot, setDisplaySpot] = React.useState(selectedSpot);
+
+  React.useEffect(() => {
+    if (selectedSpot) {
+      setDisplaySpot(selectedSpot);
+    } else {
+      const timer = setTimeout(() => setDisplaySpot(null), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedSpot]);
+
+  // Fetch calculated availability when spot is selected
+  React.useEffect(() => {
+    if (!selectedSpot) {
+      setAvailability(null);
+      return;
+    }
+
+    // Use selected date if available, otherwise use today
+    const dateToCheck = date?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0];
+
+    const fetchAvailability = async () => {
+      setIsLoadingAvailability(true);
+      try {
+        const response = await fetch(`${API_URL}/spots/${selectedSpot.id}/availability/${dateToCheck}`);
+        if (response.ok) {
+          const data = await response.json();
+          setAvailability(data);
+        } else {
+          console.error('Failed to fetch availability:', response.status);
+          setAvailability(null);
+        }
+      } catch (error) {
+        console.error('Error fetching availability:', error);
+        setAvailability(null);
+      } finally {
+        setIsLoadingAvailability(false);
+      }
     };
 
-    return (
-        <div style={{
-            position: 'absolute',
-            top: '20px',
-            left: '20px',
-            zIndex: 10,
-            background: 'white',
-            padding: '20px',
-            borderRadius: '12px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-            width: '350px',
-            transition: 'all 0.3s ease'
-        }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '15px' }}>
-                <h2 style={{ fontSize: '1.2rem', fontWeight: 600 }}>Find Parking</h2>
-                <Button1 onClick={() => setAuthModalOpen(true)}>
-                    <UserIcon size={16} />
-                    Host Sign In
-                </Button1>
+    fetchAvailability();
+  }, [selectedSpot, date]);
+
+  const handleBook = () => {
+    if (!user) {
+      setAuthModalOpen(true);
+    } else {
+      setSearchCriteria({
+        date: date?.toISOString().split('T')[0] || '',
+        startTime: startTime,
+        endTime: endTime,
+      });
+      router.push('/payment');
+    }
+  };
+
+  const handleSearchToggle = () => {
+    if (isSearchActive) {
+      // RESET
+      setIsSearchActive(false);
+      setDate(undefined);
+      setStartTime('');
+      setEndTime('');
+      setSearchCriteria({ date: '', startTime: '', endTime: '' });
+    } else {
+      // SEARCH
+      setIsSearchActive(true);
+      setSearchCriteria({
+        date: date?.toISOString().split('T')[0] || '',
+        startTime: startTime,
+        endTime: endTime,
+      });
+    }
+  };
+
+  const isSearchButtonEnabled = isSearchActive || (date !== undefined && startTime !== '' && endTime !== '');
+
+  return (
+    <PopInOutEffect isVisible={isVisible} className="absolute left-5 top-5 z-10 max-h-[calc(100vh-40px)]">
+      <Tile className="w-[350px] p-[24px] shadow-xl overflow-y-auto max-h-[calc(100vh-40px)]">
+      <div className="flex flex-col gap-[24px]">
+        <h2 className="text-xl text-left font-medium">Find Parking</h2>
+
+        <div className="flex flex-col gap-[24px]">
+          {/* Datepicker */}
+          <div className="w-full">
+            <Title2>Date</Title2>
+            <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
+              <PopoverTrigger asChild>
+                <DatePickerButton className={cn(!date && "text-muted-foreground")}>
+                  {date ? date.toLocaleDateString() : "Select date"}
+                  <ChevronDownIcon className="opacity-50" />
+                </DatePickerButton>
+              </PopoverTrigger>
+              <PopoverContent1 className="w-fit p-0" align="start">
+                <DateCalendar
+                  mode="single"
+                  selected={date}
+                  onSelect={(newDate) => {
+                    setDate(newDate);
+                    setIsDatePickerOpen(false);
+                  }}
+                  captionLayout="dropdown"
+                />
+              </PopoverContent1>
+            </Popover>
+          </div>
+
+          {/* Time Input */}
+          <div className="flex gap-[24px]">
+            <div className="flex-1">
+              <Title2>Start</Title2>
+              <TimeInput
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                disabled={!date}
+                placeholder={!date ? "-" : "09:00"}
+              />
             </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                {/* Date & Time */}
-                <div style={{ display: 'flex', gap: '10px' }}>
-                    <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: '1rem', color: '#666', marginBottom: '4px', display: 'block' }}>Date</label>
-                        <div style={{ position: 'relative' }}>
-                            <Calendar size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#666' }} />
-                            <input
-                                type="date"
-                                value={localDate}
-                                onChange={(e) => setLocalDate(e.target.value)}
-                                style={{
-                                    width: '100%',
-                                    padding: '8px 8px 8px 32px',
-                                    borderRadius: '6px',
-                                    border: '1px solid #e5e5e5',
-                                    fontSize: '1rem'
-                                }}
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '10px' }}>
-                    <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: '1rem', color: '#666', marginBottom: '4px', display: 'block' }}>Start</label>
-                        <div style={{ position: 'relative' }}>
-                            <Clock size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#666' }} />
-                            <input
-                                type="time"
-                                value={localStartTime}
-                                onChange={(e) => setLocalStartTime(e.target.value)}
-                                style={{
-                                    width: '100%',
-                                    padding: '8px 8px 8px 32px',
-                                    borderRadius: '6px',
-                                    border: '1px solid #e5e5e5',
-                                    fontSize: '1rem'
-                                }}
-                            />
-                        </div>
-                    </div>
-                    <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: '1rem', color: '#666', marginBottom: '4px', display: 'block' }}>End</label>
-                        <div style={{ position: 'relative' }}>
-                            <Clock size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#666' }} />
-                            <input
-                                type="time"
-                                value={localEndTime}
-                                onChange={(e) => setLocalEndTime(e.target.value)}
-                                style={{
-                                    width: '100%',
-                                    padding: '8px 8px 8px 32px',
-                                    borderRadius: '6px',
-                                    border: '1px solid #e5e5e5',
-                                    fontSize: '1rem'
-                                }}
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                <button
-                    onClick={handleSearch}
-                    disabled={isLoading}
-                    onMouseEnter={() => setIsHovered(true)}
-                    onMouseLeave={() => setIsHovered(false)}
-                    style={{
-                        background: isHovered ? '#333' : 'black',
-                        color: 'white',
-                        padding: '12px',
-                        borderRadius: '8px',
-                        fontWeight: 500,
-                        marginTop: '5px',
-                        transition: 'all 0.2s ease',
-                        fontSize: '1rem',
-                        cursor: isLoading ? 'wait' : 'pointer',
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        gap: '8px',
-                        opacity: isLoading ? 0.8 : 1
-                    }}>
-                    {isLoading ? (
-                        <>
-                            <div style={{
-                                width: '16px',
-                                height: '16px',
-                                border: '2px solid white',
-                                borderTop: '2px solid transparent',
-                                borderRadius: '50%',
-                                animation: 'spin 1s linear infinite'
-                            }} />
-                            Searching...
-                        </>
-                    ) : (
-                        'Search'
-                    )}
-                </button>
-                <style jsx>{`
-                    @keyframes spin {
-                        0% { transform: rotate(0deg); }
-                        100% { transform: rotate(360deg); }
-                    }
-                `}</style>
+            <div className="flex-1">
+              <Title2>End</Title2>
+              <TimeInput
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                disabled={!date}
+                placeholder={!date ? "-" : "17:00"}
+              />
             </div>
+          </div>
+
+          <Button1 
+            disabled={!isSearchButtonEnabled} 
+            onClick={handleSearchToggle}
+            className={`
+              transition-all duration-500 ease-in-out
+              ${isSearchActive 
+                ? 'bg-red-600 hover:bg-red-700 text-white border-transparent' 
+                : ''
+              }
+            `}
+          >
+            {isSearchActive ? "Reset Search" : "Search"}
+          </Button1>
         </div>
-    );
+
+        {/* --- THE ANIMATION --- */}
+        <div className={`grid overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.1,0.9,0.3,1)] ${selectedSpot ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+          <div className="min-h-0">
+            {displaySpot && (
+              <>
+                <Tile className="p-[24px] shadow-none bg-gray-50">
+                  <div className="space-y-[24px]">
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-[24px]">
+                        <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
+                          <User size={24} className="text-gray-600" />
+                        </div>
+                        <div>
+                          <div className="text-base font-normal">{displaySpot.hostName || 'Host'}</div>
+                          <div className="flex items-center gap-1.5 text-base text-green-600">
+                            <Shield size={14} />
+                            <span>Verified Host</span>
+                          </div>
+                        </div>
+                      </div>
+                      <button onClick={() => setSelectedSpot(null)} className="text-gray-500 hover:text-gray-700">✕</button>
+                    </div>
+
+                    <div>
+                      <Title2>Address</Title2>
+                      <div className="text-base font-normal text-gray-600 mt-1">{formatAddress(displaySpot)}</div>
+                    </div>
+
+                    <div>
+                      <Title2>
+                        {date ? `Available on ${availability?.day || '...'}` : 'Availability'}
+                      </Title2>
+                      <div className="text-base font-normal text-gray-600 mt-1 space-y-1">
+                        {isLoadingAvailability ? (
+                          <div className="text-gray-400">Loading availability...</div>
+                        ) : date && availability ? (
+                          availability.available_slots.length > 0 ? (
+                            availability.available_slots.map((slot, idx) => (
+                              <div key={idx} className="flex gap-2">
+                                <span>{slot.start_time} - {slot.end_time}</span>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-red-600 font-medium">Fully Booked</div>
+                          )
+                        ) : displaySpot.availabilityIntervals && displaySpot.availabilityIntervals.length > 0 ? (
+                          displaySpot.availabilityIntervals.map((interval: any, idx: number) => (
+                            <div key={idx} className="flex flex-col sm:flex-row sm:gap-2">
+                              {interval.day && <span className="font-medium text-gray-900">{interval.day},</span>}
+                              <span>{formatTime(interval.start)} - {formatTime(interval.end)}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <div>Check calendar</div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <Title2>Hourly Rate</Title2>
+                      <div className="text-base font-normal text-gray-600 mt-1">${displaySpot.pricePerHour}/hour</div>
+                    </div>
+                  </div>
+                </Tile>
+                <Button1
+                  onClick={handleBook}
+                  className="w-full mt-6"
+                  disabled={!!(date && availability && availability.available_slots.length === 0)}
+                >
+                  {date && availability && availability.available_slots.length === 0
+                    ? 'Fully Booked'
+                    : 'Book with Host'
+                  }
+                </Button1>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </Tile>
+    </PopInOutEffect>
+  );
 }
