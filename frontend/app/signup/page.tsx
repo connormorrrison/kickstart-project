@@ -12,10 +12,13 @@ import { MoveLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store';
 
-export default function SignIn() {
+export default function SignUp() {
   const router = useRouter();
+  const [firstName, setFirstName] = React.useState('');
+  const [lastName, setLastName] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
+  const [confirmPassword, setConfirmPassword] = React.useState('');
   const [isVisible, setIsVisible] = React.useState(false);
   const { spots } = useStore();
 
@@ -23,10 +26,10 @@ export default function SignIn() {
     setIsVisible(true);
   }, []);
 
-  const handleSignIn = (e: React.FormEvent) => {
+  const handleSignUp = (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement actual sign in logic
-    console.log('Sign in with:', { email, password });
+    // TODO: Implement actual sign up logic
+    console.log('Sign up with:', { firstName, lastName, email, password, confirmPassword });
   };
 
   return (
@@ -55,9 +58,31 @@ export default function SignIn() {
         <PopInOutEffect isVisible={isVisible}>
           <Tile className="w-[400px] p-[24px] shadow-xl">
           <div className="flex flex-col gap-[24px]">
-            <h1 className="text-2xl font-medium text-center">Sign In</h1>
+            <h1 className="text-2xl font-medium text-center">Sign Up</h1>
 
-            <form onSubmit={handleSignIn} className="flex flex-col gap-[24px]">
+            <form onSubmit={handleSignUp} className="flex flex-col gap-[24px]">
+              <div>
+                <Title2>First Name</Title2>
+                <CustomInput
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="Enter your first name"
+                  required
+                />
+              </div>
+
+              <div>
+                <Title2>Last Name</Title2>
+                <CustomInput
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Enter your last name"
+                  required
+                />
+              </div>
+
               <div>
                 <Title2>Email</Title2>
                 <CustomInput
@@ -79,16 +104,26 @@ export default function SignIn() {
                 />
               </div>
 
-              <Button1 type="submit" className="w-full">Sign In</Button1>
+              <div>
+                <Title2>Confirm Password</Title2>
+                <PasswordInput
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm your password"
+                  required
+                />
+              </div>
+
+              <Button1 type="submit" className="w-full">Sign Up</Button1>
             </form>
 
             <div className="text-center text-base text-gray-600">
-              Don't have an account yet?{' '}
+              Already have an account?{' '}
               <button
-                onClick={() => router.push('/signup')}
+                onClick={() => router.push('/signin')}
                 className="text-blue-600 hover:text-blue-800 font-medium"
               >
-                Sign up here
+                Sign in here
               </button>
             </div>
           </div>

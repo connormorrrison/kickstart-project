@@ -8,7 +8,7 @@ export default function DateCalendar({ className, classNames, ...props }: DateCa
     <Calendar
       className={`w-full [--cell-size:40px] ${className || ''}`}
       classNames={{
-        dropdown_root: 'relative has-focus:border-ring border border-input shadow-none has-focus:ring-ring/50 has-focus:ring-[3px] rounded-md',
+        dropdown_root: 'relative has-focus:border-ring border border-input shadow-none has-focus:ring-ring/50 has-focus:ring-[3px] rounded-xl',
         ...classNames,
       }}
       {...props}

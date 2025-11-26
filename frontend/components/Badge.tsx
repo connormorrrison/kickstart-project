@@ -14,7 +14,7 @@ export default function Badge({ text, icon, iconColor = 'blue', className }: Bad
   return (
     <span
       className={cn(
-        'px-3 py-1 text-base rounded-full font-normal border flex items-center gap-2',
+        'px-3 py-1 text-base rounded-xl font-normal border flex items-center gap-2',
         className
       )}
     >
