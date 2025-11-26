@@ -1,206 +1,359 @@
 'use client';
 
-import { useState } from 'react';
-import { X, Upload } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { useState, useMemo, useCallback } from 'react';
+import { Plus } from 'lucide-react';
+import { useStore } from '@/lib/store';
+
+// UI Components
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import CustomInput from '@/components/CustomInput';
+import Button1 from '@/components/Button1';
+import Button2 from '@/components/Button2';
+
+// Custom Logic Components
 import AvailabilityPicker from './AvailabilityPicker';
+import AddressMapPreview from './AddressMapPreview';
+
+// Helper Component for Title2
+const Title2 = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
+  <h2 className={`text-xl font-normal text-gray-900 ${className}`}>{children}</h2>
+);
 
 interface AddListingModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    onAddListing: (listing: { address: string; rate: number; availableStart: string; availableEnd: string; imagePreview: string | null }) => void;
+  isOpen: boolean;
+  onClose: (open: boolean) => void;
+  onListingAdded?: () => void;
 }
 
-export default function AddListingModal({ isOpen, onClose, onAddListing }: AddListingModalProps) {
-    const [address, setAddress] = useState('');
-    const [rate, setRate] = useState(10); // Default to $10
-    const [imagePreview, setImagePreview] = useState<string | null>(null);
-    const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
+interface TimeSlot {
+  day: string;
+  hour: string;
+  hourNum: number;
+}
 
-    // Calculate booking likelihood (inverse of price)
-    const bookingLikelihood = Math.round(100 - (rate / 20 * 100));
+interface GroupedTimeRange {
+  day: string;
+  startHour: string;
+  endHour: string;
+}
 
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setImagePreview(reader.result as string);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
+export default function AddListingModal({ isOpen, onClose, onListingAdded }: AddListingModalProps) {
+  const { user } = useStore();
+  
+  // Split Address State
+  const [street, setStreet] = useState('');
+  const [city, setCity] = useState('Vancouver');
+  const [province, setProvince] = useState('BC');
+  const [postalCode, setPostalCode] = useState('');
+  const [country, setCountry] = useState('Canada');
+  
+  const [rate, setRate] = useState<string>('10');
+  const [coordinates, setCoordinates] = useState({ lat: 49.2827, lng: -123.1207 });
+  const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        onAddListing({
-            address,
-            rate,
-            availableStart: '09:00', // Default for now
-            availableEnd: '17:00', // Default for now
-            imagePreview
+  // Derived full address for Geocoding
+  const fullAddress = useMemo(() => {
+    return [street, city, province, postalCode, country].filter(Boolean).join(', ');
+  }, [street, city, province, postalCode, country]);
+
+  // Calculate booking likelihood
+  const numericRate = parseFloat(rate) || 0;
+  const bookingLikelihood = Math.max(0, Math.round(100 - (numericRate / 50 * 100)));
+
+  const handleCoordinatesChange = useCallback((lat: number, lng: number) => {
+    setCoordinates({ lat, lng });
+  }, []);
+
+  function parseTimeToHour(time: string): number {
+    const match = time.match(/(\d+):00 (AM|PM)/);
+    if (!match) return 0;
+    let hour = parseInt(match[1]);
+    const period = match[2];
+    if (period === 'PM' && hour !== 12) hour += 12;
+    if (period === 'AM' && hour === 12) hour = 0;
+    return hour;
+  }
+
+  function formatEndHour(startHourNum: number): string {
+    const endHourNum = startHourNum + 1;
+    if (endHourNum === 0 || endHourNum === 24) return '12:00 AM';
+    else if (endHourNum < 12) return `${endHourNum}:00 AM`;
+    else if (endHourNum === 12) return '12:00 PM';
+    else return `${endHourNum - 12}:00 PM`;
+  }
+
+  function getNextDateForDay(dayName: string): string {
+    const dayOrder = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const targetDay = dayOrder.indexOf(dayName);
+    const today = new Date();
+    const currentDay = today.getDay();
+    let daysUntil = targetDay - currentDay;
+    if (daysUntil <= 0) daysUntil += 7;
+    const targetDate = new Date(today);
+    targetDate.setDate(today.getDate() + daysUntil);
+    const year = targetDate.getFullYear();
+    const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const day = String(targetDate.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  const groupedTimeRanges = useMemo(() => {
+    const slots: TimeSlot[] = Array.from(selectedSlots).map(slot => {
+      const [day, time] = slot.split('-');
+      const hourNum = parseTimeToHour(time);
+      return { day, hour: time, hourNum };
+    });
+
+    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    slots.sort((a, b) => {
+      const dayDiff = dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day);
+      if (dayDiff !== 0) return dayDiff;
+      return a.hourNum - b.hourNum;
+    });
+
+    const grouped: GroupedTimeRange[] = [];
+    let currentRange: GroupedTimeRange | null = null;
+
+    for (const slot of slots) {
+      if (!currentRange || currentRange.day !== slot.day ||
+        parseTimeToHour(currentRange.endHour) !== slot.hourNum) {
+        if (currentRange) grouped.push(currentRange);
+        currentRange = {
+          day: slot.day,
+          startHour: slot.hour,
+          endHour: formatEndHour(slot.hourNum)
+        };
+      } else {
+        currentRange.endHour = formatEndHour(slot.hourNum);
+      }
+    }
+    if (currentRange) grouped.push(currentRange);
+
+    return grouped;
+  }, [selectedSlots]);
+
+  const backendFormattedData = useMemo(() => {
+    return groupedTimeRanges.map(range => {
+      const date = getNextDateForDay(range.day);
+      const startHour = parseTimeToHour(range.startHour);
+      const endHour = parseTimeToHour(range.endHour);
+      return { date, start: startHour, end: endHour };
+    });
+  }, [groupedTimeRanges]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!user) {
+      setSubmitError('You must be logged in to create a listing');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const promises = backendFormattedData.map(async (timeRange) => {
+        const response = await fetch('http://localhost:8000/postings/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: user.username,
+            password_hash: user.password_hash,
+            address: fullAddress,
+            lat: coordinates.lat,
+            lng: coordinates.lng,
+            price: numericRate,
+            date: timeRange.date,
+            start: timeRange.start,
+            end: timeRange.end,
+          }),
         });
-        // Reset form
-        setAddress('');
-        setRate(10);
-        setImagePreview(null);
-        setSelectedSlots(new Set());
-    };
 
-    if (!isOpen) return null;
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.detail || 'Failed to create posting');
+        }
+        return response.json();
+      });
 
-    return (
-        <div style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            zIndex: 50,
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            background: 'rgba(0,0,0,0.5)'
-        }}>
-            <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                style={{
-                    background: 'white',
-                    padding: '30px',
-                    borderRadius: '16px',
-                    width: '90%',
-                    maxWidth: '500px',
-                    maxHeight: '90vh',
-                    overflow: 'auto',
-                    position: 'relative'
-                }}
-            >
-                <button
-                    onClick={onClose}
-                    style={{ position: 'absolute', top: '20px', right: '20px', color: '#666', cursor: 'pointer', border: 'none', background: 'transparent' }}
-                >
-                    <X size={20} />
-                </button>
+      await Promise.all(promises);
 
-                <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '20px' }}>Add New Listing</h2>
+      // Reset form
+      setStreet('');
+      setPostalCode('');
+      setRate('10');
+      setCoordinates({ lat: 49.2827, lng: -123.1207 });
+      setSelectedSlots(new Set());
+      
+      alert(`Successfully created ${backendFormattedData.length} listing(s)!`);
 
-                <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    {/* Image Upload */}
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '1rem', fontWeight: 500 }}>Spot Image</label>
-                        <div
-                            style={{
-                                border: '2px dashed #e5e5e5',
-                                borderRadius: '12px',
-                                padding: '20px',
-                                textAlign: 'center',
-                                cursor: 'pointer',
-                                background: imagePreview ? `url(${imagePreview}) center/cover no-repeat` : '#f9f9f9',
-                                height: '200px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                position: 'relative',
-                                overflow: 'hidden'
-                            }}
-                            onClick={() => document.getElementById('image-upload')?.click()}
-                        >
-                            {!imagePreview && (
-                                <div style={{ color: '#666' }}>
-                                    <Upload size={32} style={{ margin: '0 auto 8px' }} />
-                                    <p style={{ fontWeight: 600, marginBottom: '4px' }}>Click to upload</p>
-                                    <p style={{ fontSize: '0.8rem' }}>JPG, PNG (Max 5MB)</p>
-                                </div>
-                            )}
-                            <input
-                                id="image-upload"
-                                type="file"
-                                accept="image/*"
-                                onChange={handleImageUpload}
-                                style={{ display: 'none' }}
-                            />
-                        </div>
-                    </div>
+      if (onListingAdded) {
+        onListingAdded();
+      }
+      onClose(false);
+    } catch (error) {
+      console.error('Error creating listing:', error);
+      setSubmitError(error instanceof Error ? error.message : 'Failed to create listing');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-                    {/* Address */}
-                    <div>
-                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '1rem', fontWeight: 500 }}>Address</label>
-                        <input
-                            required
-                            type="text"
-                            value={address}
-                            onChange={(e) => setAddress(e.target.value)}
-                            placeholder="e.g. 1234 Main St, Vancouver, BC"
-                            style={{
-                                width: '100%',
-                                padding: '12px',
-                                borderRadius: '8px',
-                                border: '1px solid #e5e5e5',
-                                fontSize: '1rem'
-                            }}
-                        />
-                    </div>
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto sm:rounded-xl">
+        <DialogHeader>
+          <DialogTitle className="font-normal text-2xl">Add New Listing</DialogTitle>
+          <DialogDescription className="text-base text-gray-500">
+            Enter the details for your parking spot to start earning
+          </DialogDescription>
+        </DialogHeader>
+        
+        <form onSubmit={handleSubmit} className="grid gap-8 py-4">
+          
+          {/* Address Section */}
+          <div className="grid gap-4">
+            <Title2>Address</Title2>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <CustomInput 
+                  placeholder="Street Address" 
+                  value={street}
+                  onChange={(e) => setStreet(e.target.value)}
+                  className="rounded-xl"
+                  required
+                />
+              </div>
+              <CustomInput 
+                placeholder="City" 
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                className="rounded-xl"
+                required
+              />
+              <CustomInput 
+                placeholder="Province / State" 
+                value={province}
+                onChange={(e) => setProvince(e.target.value)}
+                className="rounded-xl"
+                required
+              />
+              <CustomInput 
+                placeholder="Postal / Zip Code" 
+                value={postalCode}
+                onChange={(e) => setPostalCode(e.target.value)}
+                className="rounded-xl"
+                required
+              />
+              <CustomInput 
+                placeholder="Country" 
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+                className="rounded-xl"
+                required
+              />
+            </div>
+            
+            <div className="rounded-xl overflow-hidden border border-gray-100 mt-2">
+              <AddressMapPreview
+                address={fullAddress}
+                onCoordinatesChange={handleCoordinatesChange}
+              />
+            </div>
+          </div>
 
-                    {/* Rate Slider */}
-                    <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                            <label style={{ fontSize: '1rem', fontWeight: 500 }}>Hourly Rate</label>
-                            <div style={{ textAlign: 'right' }}>
-                                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#111827' }}>${rate.toFixed(2)}</div>
-                                <div style={{ fontSize: '0.75rem', color: bookingLikelihood > 70 ? '#059669' : bookingLikelihood > 30 ? '#f59e0b' : '#dc2626' }}>
-                                    {bookingLikelihood}% customers likely to book
-                                </div>
-                            </div>
-                        </div>
-                        <input
-                            type="range"
-                            min="0"
-                            max="20"
-                            step="0.5"
-                            value={rate}
-                            onChange={(e) => setRate(parseFloat(e.target.value))}
-                            style={{
-                                width: '100%',
-                                height: '8px',
-                                borderRadius: '4px',
-                                background: `linear-gradient(to right, #059669 0%, #f59e0b 50%, #dc2626 100%)`,
-                                outline: 'none',
-                                cursor: 'pointer'
-                            }}
-                        />
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '0.75rem', color: '#6b7280' }}>
-                            <span>$0</span>
-                            <span>$20</span>
-                        </div>
-                    </div>
+          {/* Rate Section */}
+          <div className="grid gap-4">
+            <Title2>Hourly Rate</Title2>
+            <div className="flex items-start gap-4">
+              <div className="relative w-full">
+                {/* Vertically centered dollar sign */}
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">$</span>
+                <CustomInput
+                  type="number"
+                  min="0"
+                  max="200"
+                  step="1"
+                  value={rate}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '' || (parseFloat(val) >= 0 && parseFloat(val) <= 200)) {
+                      setRate(val);
+                    }
+                  }}
+                  className="pl-7 rounded-xl"
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+              <div className="flex flex-col justify-center h-10 min-w-[140px]">
+                <span className={`text-base font-normal ${bookingLikelihood > 70 ? 'text-green-600' : bookingLikelihood > 30 ? 'text-amber-500' : 'text-red-600'}`}>
+                  {bookingLikelihood}% likely to book
+                </span>
+              </div>
+            </div>
+          </div>
 
-                    {/* Availability Picker */}
-                    <AvailabilityPicker
-                        selectedSlots={selectedSlots}
-                        onSlotsChange={setSelectedSlots}
-                    />
+          {/* Availability Picker */}
+          <div className="grid gap-4">
+            <Title2>Availability</Title2>
+            <AvailabilityPicker
+              selectedSlots={selectedSlots}
+              onSlotsChange={setSelectedSlots}
+            />
+          </div>
 
-                    <button
-                        type="submit"
-                        style={{
-                            width: '100%',
-                            background: 'black',
-                            color: 'white',
-                            padding: '14px',
-                            borderRadius: '8px',
-                            fontWeight: 600,
-                            fontSize: '1rem',
-                            marginTop: '10px',
-                            cursor: 'pointer',
-                            border: 'none'
-                        }}
+          {/* Times Selected Display */}
+          {groupedTimeRanges.length > 0 && (
+            <div className="grid gap-4">
+              <Title2>Times Selected</Title2>
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                <div className="max-h-40 overflow-auto space-y-2">
+                  {groupedTimeRanges.map((range, index) => (
+                    <div
+                      key={index}
+                      className="text-base font-normal text-gray-900 pb-2 border-b border-gray-200 last:border-0 last:pb-0"
                     >
-                        Add Listing
-                    </button>
-                </form>
-            </motion.div>
-        </div>
-    );
+                      <span className="font-medium">{range.day},</span>
+                      <span className="ml-1">{range.startHour} - {range.endHour}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {submitError && (
+            <div className="p-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm">
+              {submitError}
+            </div>
+          )}
+
+          {/* Footer Spacing */}
+          <DialogFooter className="gap-3 sm:gap-3 pt-4">
+            <Button2 type="button" onClick={() => onClose(false)}>
+              Cancel
+            </Button2>
+            <Button1 
+              type="submit" 
+              disabled={selectedSlots.size === 0 || isSubmitting}
+            >
+              <Plus size={18} className="mr-2" />
+              {isSubmitting ? 'Creating...' : 'Add Listing'}
+            </Button1>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
 }

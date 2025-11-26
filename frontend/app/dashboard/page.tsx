@@ -8,6 +8,7 @@ import Tile from '@/components/Tile';
 import Button1 from '@/components/Button1';
 import Button2 from '@/components/Button2';
 import UserMenu from '@/components/UserMenu';
+import AddListingModal from '@/components/AddListingModal';
 
 interface TimeSlot {
   date: string;
@@ -35,6 +36,7 @@ export default function Dashboard() {
   const { signOut } = require('@/hooks/useAuth').useAuth();
   const [listings, setListings] = React.useState<Listing[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
+  const [isAddListingModalOpen, setIsAddListingModalOpen] = React.useState(false);
 
   // Redirect to signin if not authenticated
   React.useEffect(() => {
@@ -51,6 +53,13 @@ export default function Dashboard() {
   const activeListingsCount = listings.filter(l => l.status === 'active').length;
   const totalBookings = listings.reduce((sum, listing) => sum + listing.bookings, 0);
   const totalTimeSlots = listings.reduce((sum, listing) => sum + listing.timeSlots.length, 0);
+
+  const handleListingAdded = () => {
+    // In a real app, you would fetch the updated listings here
+    console.log("Listing added! Refreshing data...");
+    // For now, we just close the modal
+    setIsAddListingModalOpen(false);
+  };
 
   return (
     <main className="min-h-screen w-full bg-gray-50 relative">
@@ -74,7 +83,7 @@ export default function Dashboard() {
             Welcome back, {user.first_name}
           </h1>
           <p className="mt-1 text-base font-normal text-gray-500">
-            Manage your current bookings and current listings.
+            Manage your current bookings and current listings
           </p>
         </div>
 
@@ -103,7 +112,7 @@ export default function Dashboard() {
           <div className="grid gap-4">
             {/* Using Tile for empty state */}
             <Tile className="p-8 flex justify-center items-center">
-              <p className="text-base text-gray-500">You have no active bookings.</p>
+              <p className="text-base text-gray-500">You have no active bookings</p>
             </Tile>
           </div>
         </div>
@@ -112,7 +121,7 @@ export default function Dashboard() {
         <div className="mt-12 pb-12">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-normal text-gray-900">Your Listings</h2>
-            <Button1 onClick={() => alert('Add listing modal coming soon!')}>
+            <Button1 onClick={() => setIsAddListingModalOpen(true)}>
               <Plus size={18} className="mr-2" />
               Add Listing
             </Button1>
@@ -122,7 +131,7 @@ export default function Dashboard() {
             {listings.length === 0 ? (
               // Using Tile for empty state
               <Tile className="p-8 flex justify-center items-center">
-                <p className="text-base text-gray-500">You haven't listed any spots yet.</p>
+                <p className="text-base text-gray-500">You haven't listed any spots yet</p>
               </Tile>
             ) : (
               // Listings sorted by recently added (descending ID)
@@ -145,6 +154,13 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Add Listing Modal */}
+      <AddListingModal 
+        isOpen={isAddListingModalOpen} 
+        onClose={() => setIsAddListingModalOpen(false)}
+        onListingAdded={handleListingAdded}
+      />
     </main>
   );
 }
