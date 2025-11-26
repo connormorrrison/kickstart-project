@@ -3,6 +3,7 @@
 import { useStore } from '@/lib/store';
 import { Star, MapPin } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { formatAddress, formatShortAddress } from '@/lib/addressUtils';
 
 export default function SpotList() {
     const { selectedSpot, setSelectedSpot, searchCriteria, spots } = useStore();
@@ -10,8 +11,9 @@ export default function SpotList() {
     // Simple filter logic (mock)
     const filteredSpots = spots.filter(spot => {
         if (!searchCriteria.location) return true;
-        return spot.address.toLowerCase().includes(searchCriteria.location.toLowerCase()) ||
-            spot.title.toLowerCase().includes(searchCriteria.location.toLowerCase());
+        const fullAddress = formatAddress(spot);
+        return fullAddress.toLowerCase().includes(searchCriteria.location.toLowerCase()) ||
+            spot.street.toLowerCase().includes(searchCriteria.location.toLowerCase());
     });
 
     return (
@@ -72,7 +74,7 @@ export default function SpotList() {
                             <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '4px' }}>{spot.title}</h3>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#666', fontSize: '0.85rem', marginBottom: '10px' }}>
                                 <MapPin size={14} />
-                                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{spot.address}</span>
+                                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{formatShortAddress(spot)}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div>

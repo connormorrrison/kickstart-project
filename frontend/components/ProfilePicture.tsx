@@ -22,12 +22,12 @@ export const ProfilePicture = ({ size = 'md', className }: ProfilePictureProps) 
   return (
     <div
       className={cn(
-        "rounded-full bg-gray-400 flex items-center justify-center shrink-0",
+        "rounded-full bg-gray-200 flex items-center justify-center shrink-0",
         sizeClasses[size],
         className
       )}
     >
-      <User size={iconSizes[size]} className="text-white" />
+      <User size={iconSizes[size]} className="text-gray-600" />
     </div>
   )
 }

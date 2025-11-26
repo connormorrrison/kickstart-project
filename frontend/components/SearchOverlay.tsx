@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { ChevronDownIcon, User, MapPin, Shield } from 'lucide-react';
+import { ChevronDownIcon, User, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useStore } from '@/lib/store';
 import Button1 from '@/components/Button1';
@@ -13,6 +13,7 @@ import Title2 from '@/components/Title2';
 import { PopInOutEffect } from '@/components/PopInOutEffect';
 import { Popover, PopoverTrigger } from '@/components/ui/popover';
 import PopoverContent1 from '@/components/PopoverContent1';
+import { formatAddress } from '@/lib/addressUtils';
 
 export default function SearchOverlay() {
   const [date, setDate] = React.useState<Date | undefined>(undefined);
@@ -20,6 +21,10 @@ export default function SearchOverlay() {
   const [endTime, setEndTime] = React.useState('11:00');
   const [isDatePickerOpen, setIsDatePickerOpen] = React.useState(false);
   const [isVisible, setIsVisible] = React.useState(false);
+  
+  // New state to track if we have performed a search
+  const [isSearchActive, setIsSearchActive] = React.useState(false);
+
   const { selectedSpot, setSelectedSpot, user, setAuthModalOpen } = useStore();
 
   React.useEffect(() => {
@@ -43,6 +48,25 @@ export default function SearchOverlay() {
     else alert('Proceeding to payment...');
   };
 
+  const handleSearchToggle = () => {
+    if (isSearchActive) {
+      // RESET LOGIC
+      setIsSearchActive(false);
+      setDate(undefined);
+      setStartTime('10:00'); // Reset to defaults
+      setEndTime('11:00');
+      // Here you would trigger the map to show all pins again
+    } else {
+      // SEARCH LOGIC
+      setIsSearchActive(true);
+      // Here you would trigger the map filtering based on date/time
+    }
+  };
+
+  // Button is enabled if we are already searching (to allow reset) 
+  // OR if all fields are filled (to allow search)
+  const isButtonEnabled = isSearchActive || (date !== undefined && startTime !== '' && endTime !== '');
+
   return (
     <PopInOutEffect isVisible={isVisible} className="absolute left-5 top-5 z-10">
       <Tile className="w-[350px] p-[24px] shadow-xl">
@@ -55,7 +79,12 @@ export default function SearchOverlay() {
             <Title2>Date</Title2>
             <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
               <PopoverTrigger asChild>
-                <DatePickerButton className={cn(!date && "text-muted-foreground")}>
+                <DatePickerButton 
+                  className={cn(!date && "text-muted-foreground")}
+                  // Optional: Disable input changes while search is active to force reset first?
+                  // removed disabled prop to allow changing search criteria if desired, 
+                  // but per prompt requirements, we just reset on click.
+                >
                   {date ? date.toLocaleDateString() : "Select date"}
                   <ChevronDownIcon className="opacity-50" />
                 </DatePickerButton>
@@ -86,7 +115,19 @@ export default function SearchOverlay() {
             </div>
           </div>
 
-          <Button1 disabled={!date}>Search</Button1>
+          <Button1 
+            disabled={!isButtonEnabled} 
+            onClick={handleSearchToggle}
+            className={`
+              transition-all duration-500 ease-in-out
+              ${isSearchActive 
+                ? 'bg-green-600 hover:bg-green-700 text-white border-transparent' 
+                : ''
+              }
+            `}
+          >
+            {isSearchActive ? "Reset Search" : "Search"}
+          </Button1>
         </div>
 
         {/* --- THE ANIMATION --- */}
@@ -108,7 +149,7 @@ export default function SearchOverlay() {
                         </div>
                         <div>
                           <div className="text-base font-normal">{displaySpot.hostName || 'Host'}</div>
-                          <div className="flex items-center gap-[24px] text-base text-green-600">
+                          <div className="flex items-center gap-1.5 text-base text-green-600">
                             <Shield size={14} />
                             <span>Verified Host</span>
                           </div>
@@ -119,30 +160,27 @@ export default function SearchOverlay() {
 
                     <div>
                       <Title2>Address</Title2>
-                      <div className="text-base font-normal text-gray-600">{displaySpot.address}</div>
+                      <div className="text-base font-normal text-gray-600 mt-1">{formatAddress(displaySpot)}</div>
                     </div>
 
                     <div>
                       <Title2>Full Availability</Title2>
-                      <div className="text-base font-normal text-gray-600">
-                        <div>Monday - Sunday</div>
-                        <div>
-                          {displaySpot.availabilityIntervals && displaySpot.availabilityIntervals.length > 0
-                            ? displaySpot.availabilityIntervals.map((interval, idx) => (
-                                <span key={idx}>
-                                  {interval.start} - {interval.end}
-                                  {idx < displaySpot.availabilityIntervals!.length - 1 ? ', ' : ''}
-                                </span>
-                              ))
-                            : `${displaySpot.availableStart} - ${displaySpot.availableEnd}`
-                          }
-                        </div>
+                      <div className="text-base font-normal text-gray-600 mt-1 space-y-1">
+                        {displaySpot.availabilityIntervals && displaySpot.availabilityIntervals.length > 0
+                          ? displaySpot.availabilityIntervals.map((interval: any, idx: number) => (
+                              <div key={idx} className="flex flex-col sm:flex-row sm:gap-2">
+                                {interval.day && <span className="font-medium text-gray-900">{interval.day},</span>}
+                                <span>{interval.start} - {interval.end}</span>
+                              </div>
+                            ))
+                          : <div>See availability below</div>
+                        }
                       </div>
                     </div>
 
                     <div>
                       <Title2>Hourly Rate</Title2>
-                      <div className="text-base font-normal text-gray-600">${displaySpot.pricePerHour}/hour</div>
+                      <div className="text-base font-normal text-gray-600 mt-1">${displaySpot.pricePerHour}/hour</div>
                     </div>
                   </div>
                 </Tile>

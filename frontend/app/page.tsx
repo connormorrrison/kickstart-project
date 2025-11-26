@@ -13,21 +13,8 @@ export default function Home() {
   const { selectedSpot, setSelectedSpot, spots, searchCriteria, user } = useStore();
   const { signOut } = require('@/hooks/useAuth').useAuth();
 
-  // Filter spots based on time and date availability
-  const filteredSpots = spots.filter(spot => {
-    // Check time availability
-    const isTimeAvailable = spot.availableStart <= searchCriteria.startTime &&
-      spot.availableEnd >= searchCriteria.endTime;
-
-    // Check date availability (if spot has dates)
-    let isDateAvailable = true;
-    if (spot.availableDateStart && spot.availableDateEnd) {
-      isDateAvailable = searchCriteria.date >= spot.availableDateStart &&
-        searchCriteria.date <= spot.availableDateEnd;
-    }
-
-    return isTimeAvailable && isDateAvailable;
-  });
+  // TODO: Implement proper availability filtering with new data structure
+  const filteredSpots = spots;
 
   return (
     <main style={{ height: '100vh', width: '100vw', position: 'relative', overflow: 'hidden' }}>

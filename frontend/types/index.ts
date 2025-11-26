@@ -1,19 +1,16 @@
 export interface ParkingSpot {
     id: string;
-    title: string;
-    description: string;
-    address: string;
+    street: string;
+    city: string;
+    province: string;
+    postalCode: string;
+    country: string;
     lat: number;
     lng: number;
     pricePerHour: number;
-    hostId: string;
+    hostId: number;
     hostName?: string;
-    availableStart: string; // ISO time string
-    availableEnd: string; // ISO time string
-    availabilityIntervals?: Array<{ start: string; end: string }>; // Multiple time ranges
-    availableDateStart?: string; // YYYY-MM-DD
-    availableDateEnd?: string; // YYYY-MM-DD
-    images: string[];
+    availabilityIntervals?: Array<{ day: string; start: string; end: string }>;
 }
 
 export interface User {

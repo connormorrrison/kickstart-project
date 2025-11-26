@@ -103,7 +103,7 @@ export default function Dashboard() {
         <div className="mt-12">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-2xl font-normal text-gray-900">Your Bookings</h2>
-            <Button1 onClick={() => router.push('/search')}>
+            <Button1 onClick={() => router.push('/')}>
               <Search size={18} className="mr-2" />
               Find Parking
             </Button1>

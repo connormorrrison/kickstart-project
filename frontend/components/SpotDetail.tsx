@@ -5,6 +5,7 @@ import { X, Star, MapPin, Clock, Shield } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Tile from '@/components/Tile';
 import Button1 from '@/components/Button1';
+import { formatAddress } from '@/lib/addressUtils';
 
 export default function SpotDetail() {
     const { selectedSpot, setSelectedSpot, user, setAuthModalOpen } = useStore();
@@ -56,7 +57,7 @@ export default function SpotDetail() {
 
                         <div className="flex items-center gap-1.5 text-gray-600 mb-5">
                             <MapPin size={16} />
-                            <span>{selectedSpot.address}</span>
+                            <span>{formatAddress(selectedSpot)}</span>
                         </div>
 
                         <div className="flex gap-4 mb-6">

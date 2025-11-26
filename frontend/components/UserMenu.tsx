@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { LayoutDashboard, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, LogOut } from "lucide-react";
 import Tile from "@/components/Tile";
 import { Text4 } from "@/components/Text4";
 import { Text5 } from "@/components/Text5";
@@ -142,13 +142,6 @@ export default function UserMenu({ onSignOut, showDashboard = true }: UserMenuPr
                   <span className="text-base font-normal text-gray-700">Dashboard</span>
                 </button>
               )}
-              <button
-                onClick={() => handleMenuItemClick(() => router.push('/settings'))}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-gray-100 transition-colors text-left"
-              >
-                <Settings size={18} className="text-gray-600" />
-                <span className="text-base font-normal text-gray-700">Settings</span>
-              </button>
               <button
                 onClick={() => handleMenuItemClick(onSignOut)}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-gray-100 transition-colors text-left"
