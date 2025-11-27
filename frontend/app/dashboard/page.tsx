@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Home, Search } from 'lucide-react';
 import { useStore } from '@/lib/store';
+import { useAuth } from '@/hooks/useAuth';
 import Tile from '@/components/Tile';
 import Button1 from '@/components/Button1';
 import Button2 from '@/components/Button2';
@@ -17,7 +18,7 @@ import { bookingsApi, spotsApi, Booking, ParkingSpot } from '@/lib/api';
 // Google Static Maps URL
 const getStaticMapUrl = (lat: number, lng: number) => {
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-  if (!apiKey) return ''; 
+  if (!apiKey) return '';
   // Size 400x200 matches the tile image aspect ratio
   return `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&size=400x200&scale=2&maptype=roadmap&markers=color:red%7C${lat},${lng}&key=${apiKey}`;
 };
@@ -28,10 +29,10 @@ const formatTime = (timeStr: string) => {
   const [hours, minutes] = timeStr.split(':');
   const date = new Date();
   date.setHours(parseInt(hours), parseInt(minutes));
-  return date.toLocaleTimeString('en-US', { 
-    hour: 'numeric', 
-    minute: '2-digit', 
-    hour12: true 
+  return date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
   });
 };
 
@@ -40,14 +41,17 @@ const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Satur
 
 export default function Dashboard() {
   const router = useRouter();
-  const { user } = useStore();
-  const { signOut } = require('@/hooks/useAuth').useAuth();
+  const { user, isLoading } = useStore();
+  const { signOut } = useAuth();
   const [bookings, setBookings] = React.useState<Booking[]>([]);
   const [listings, setListings] = React.useState<ParkingSpot[]>([]);
   const [bookingSpots, setBookingSpots] = React.useState<Map<string, ParkingSpot>>(new Map());
   const [isAddListingModalOpen, setIsAddListingModalOpen] = React.useState(false);
 
   React.useEffect(() => {
+    // Wait for auth check to complete
+    if (isLoading) return;
+
     if (!user) {
       router.push('/signin');
       return;
@@ -80,6 +84,14 @@ export default function Dashboard() {
 
     fetchData();
   }, [user, router]);
+
+  if (isLoading) {
+    return (
+      <main className="min-h-screen w-full bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      </main>
+    );
+  }
 
   if (!user) return null;
 
@@ -208,13 +220,12 @@ export default function Dashboard() {
                             <p className="text-lg font-normal text-black">${booking.total_price.toFixed(2)}</p>
                           </div>
                           <span
-                            className={`px-3 py-1 rounded-full text-base font-normal ${
-                              booking.status === 'confirmed'
-                                ? 'bg-green-100 text-green-800'
-                                : booking.status === 'pending'
+                            className={`px-3 py-1 rounded-full text-base font-normal ${booking.status === 'confirmed'
+                              ? 'bg-green-100 text-green-800'
+                              : booking.status === 'pending'
                                 ? 'bg-yellow-100 text-yellow-800'
                                 : 'bg-gray-100 text-gray-800'
-                            }`}
+                              }`}
                           >
                             {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
                           </span>
@@ -248,7 +259,7 @@ export default function Dashboard() {
             ) : (
               listings.map((listing) => {
                 // Sort intervals Mon-Sun
-                const sortedIntervals = listing.availability_intervals?.sort((a, b) => 
+                const sortedIntervals = listing.availability_intervals?.sort((a, b) =>
                   dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day)
                 );
 
@@ -266,7 +277,7 @@ export default function Dashboard() {
 
                       {/* Content */}
                       <div className="p-4 flex flex-col gap-6 flex-1">
-                        
+
                         {/* Address Block */}
                         <div>
                           {/* Consistent mb-1 for title spacing */}
@@ -278,7 +289,7 @@ export default function Dashboard() {
 
                         {/* Availability Block */}
                         <div>
-                           {/* Consistent mb-1 for title spacing */}
+                          {/* Consistent mb-1 for title spacing */}
                           <h3 className="text-base font-normal text-gray-500 mb-1">Full Availability</h3>
                           <div className="flex flex-col gap-2">
                             {sortedIntervals && sortedIntervals.length > 0 ? (
@@ -300,19 +311,18 @@ export default function Dashboard() {
 
                         {/* Rate Block */}
                         <div className="mt-auto">
-                           {/* Consistent mb-1 for title spacing */}
-                           <h3 className="text-base font-normal text-gray-500 mb-1">Hourly Rate</h3>
-                           <div className="flex items-center justify-between">
-                              <p className="text-lg font-normal text-black">
-                                ${listing.price_per_hour.toFixed(2)}/hour
-                              </p>
-                              {/* Status Badge */}
-                              <span className={`px-3 py-1 rounded-full text-base font-normal ${
-                                listing.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                          {/* Consistent mb-1 for title spacing */}
+                          <h3 className="text-base font-normal text-gray-500 mb-1">Hourly Rate</h3>
+                          <div className="flex items-center justify-between">
+                            <p className="text-lg font-normal text-black">
+                              ${listing.price_per_hour.toFixed(2)}/hour
+                            </p>
+                            {/* Status Badge */}
+                            <span className={`px-3 py-1 rounded-full text-base font-normal ${listing.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
                               }`}>
-                                {listing.is_active ? 'Active' : 'Inactive'}
-                              </span>
-                           </div>
+                              {listing.is_active ? 'Active' : 'Inactive'}
+                            </span>
+                          </div>
                         </div>
 
                       </div>
@@ -325,8 +335,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <AddListingModal 
-        isOpen={isAddListingModalOpen} 
+      <AddListingModal
+        isOpen={isAddListingModalOpen}
         onClose={() => setIsAddListingModalOpen(false)}
         onListingAdded={handleListingAdded}
       />

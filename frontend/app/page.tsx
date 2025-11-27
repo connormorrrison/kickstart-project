@@ -8,6 +8,7 @@ import { User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { useEffect, useState } from 'react';
+import { useAuth } from '@/hooks/useAuth';
 import { spotsApi } from '@/lib/api';
 import { normalizeSpots } from '@/lib/dataTransform';
 
@@ -16,7 +17,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 export default function Home() {
   const router = useRouter();
   const { selectedSpot, setSelectedSpot, spots, setSpots, searchCriteria, user } = useStore();
-  const { signOut } = require('@/hooks/useAuth').useAuth();
+  const { signOut } = useAuth();
   const [filteredSpots, setFilteredSpots] = useState<any[]>(spots || []);
 
   // Fetch spots from API on mount

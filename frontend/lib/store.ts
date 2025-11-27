@@ -20,6 +20,8 @@ interface AppState {
     setSearchCriteria: (criteria: Partial<AppState['searchCriteria']>) => void;
     isAuthModalOpen: boolean;
     setAuthModalOpen: (isOpen: boolean) => void;
+    isLoading: boolean;
+    setLoading: (isLoading: boolean) => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -42,4 +44,6 @@ export const useStore = create<AppState>((set) => ({
         })),
     isAuthModalOpen: false,
     setAuthModalOpen: (isOpen) => set({ isAuthModalOpen: isOpen }),
+    isLoading: true, // Start as true to prevent premature redirects
+    setLoading: (isLoading) => set({ isLoading }),
 }));

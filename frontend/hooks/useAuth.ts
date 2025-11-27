@@ -6,26 +6,38 @@ import { setToken, removeToken, getToken } from '@/lib/auth';
 
 export const useAuth = () => {
   const router = useRouter();
-  const { user, setUser } = useStore();
-  const [isLoading, setIsLoading] = useState(false);
+  const { user, setUser, isLoading, setLoading } = useStore();
   const [error, setError] = useState<string | null>(null);
 
   // Check if user is authenticated on mount
   useEffect(() => {
     const token = getToken();
+    console.log('AuthProvider: Checking token...', token ? 'Token found' : 'No token');
+
     if (token && !user) {
+      console.log('AuthProvider: Fetching user...');
+      setLoading(true);
       // Try to fetch user data
       authApi.getCurrentUser()
-        .then(setUser)
-        .catch(() => {
+        .then((userData) => {
+          console.log('AuthProvider: User fetched successfully', userData);
+          setUser(userData);
+        })
+        .catch((err) => {
+          console.error('AuthProvider: Failed to fetch user', err);
           // Token is invalid, remove it
           removeToken();
+        })
+        .finally(() => {
+          setLoading(false);
         });
+    } else {
+      setLoading(false);
     }
-  }, [user, setUser]);
+  }, [user, setUser, setLoading]);
 
   const signUp = async (data: SignUpData) => {
-    setIsLoading(true);
+    setLoading(true);
     setError(null);
     try {
       // Register the user
@@ -49,12 +61,12 @@ export const useAuth = () => {
       setError(errorMessage);
       throw err;
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   const signIn = async (data: SignInData) => {
-    setIsLoading(true);
+    setLoading(true);
     setError(null);
     try {
       // Get token
@@ -74,7 +86,7 @@ export const useAuth = () => {
       setError(errorMessage);
       throw err;
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
@@ -85,7 +97,7 @@ export const useAuth = () => {
   };
 
   const changePassword = async (currentPassword: string, newPassword: string) => {
-    setIsLoading(true);
+    setLoading(true);
     setError(null);
     try {
       await authApi.changePassword({
@@ -97,7 +109,7 @@ export const useAuth = () => {
       setError(errorMessage);
       throw err;
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
