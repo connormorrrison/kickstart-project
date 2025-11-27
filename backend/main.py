@@ -659,6 +659,7 @@ class AvailabilityForDateOut(BaseModel):
     date: str
     day: str
     available_slots: List[AvailableSlot]
+    operating_hours: List[AvailableSlot]
 
 @app.get("/spots/{spot_id}/availability/{date}", response_model=AvailabilityForDateOut)
 def get_available_slots_for_date(spot_id: str, date: str):
@@ -700,7 +701,15 @@ def get_available_slots_for_date(spot_id: str, date: str):
 
         bookings = bookings_response.data if bookings_response.data else []
 
-        # 5. The Subtraction Logic
+        # 5. Calculate Operating Hours (Base Intervals)
+        operating_hours = []
+        for base_interval in intervals_response.data:
+            operating_hours.append(AvailableSlot(
+                start_time=base_interval["start_time"],
+                end_time=base_interval["end_time"]
+            ))
+
+        # 6. The Subtraction Logic
         all_available_slots = []
 
         # We iterate over every "Base Interval" the host has set
@@ -768,7 +777,8 @@ def get_available_slots_for_date(spot_id: str, date: str):
         return AvailabilityForDateOut(
             date=date,
             day=day_name,
-            available_slots=all_available_slots
+            available_slots=all_available_slots,
+            operating_hours=operating_hours
         )
 
     except HTTPException:
